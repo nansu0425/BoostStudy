@@ -7,6 +7,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "BoostAsioTutorial", "BoostA
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Timer1", "src\BoostAsioTutorial\Timer1\Timer1.vcxproj", "{EB4016D1-09A0-4627-93AC-B2263012E6BD}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Timer2", "src\BoostAsioTutorial\Timer2\Timer2.vcxproj", "{F6D6DE90-9156-499A-8F49-13DD7B84CBD6}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -23,11 +25,20 @@ Global
 		{EB4016D1-09A0-4627-93AC-B2263012E6BD}.Release|x64.Build.0 = Release|x64
 		{EB4016D1-09A0-4627-93AC-B2263012E6BD}.Release|x86.ActiveCfg = Release|Win32
 		{EB4016D1-09A0-4627-93AC-B2263012E6BD}.Release|x86.Build.0 = Release|Win32
+		{F6D6DE90-9156-499A-8F49-13DD7B84CBD6}.Debug|x64.ActiveCfg = Debug|x64
+		{F6D6DE90-9156-499A-8F49-13DD7B84CBD6}.Debug|x64.Build.0 = Debug|x64
+		{F6D6DE90-9156-499A-8F49-13DD7B84CBD6}.Debug|x86.ActiveCfg = Debug|Win32
+		{F6D6DE90-9156-499A-8F49-13DD7B84CBD6}.Debug|x86.Build.0 = Debug|Win32
+		{F6D6DE90-9156-499A-8F49-13DD7B84CBD6}.Release|x64.ActiveCfg = Release|x64
+		{F6D6DE90-9156-499A-8F49-13DD7B84CBD6}.Release|x64.Build.0 = Release|x64
+		{F6D6DE90-9156-499A-8F49-13DD7B84CBD6}.Release|x86.ActiveCfg = Release|Win32
+		{F6D6DE90-9156-499A-8F49-13DD7B84CBD6}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{EB4016D1-09A0-4627-93AC-B2263012E6BD} = {BCB89F56-5AD3-4384-BAB6-524165AF612A}
+		{F6D6DE90-9156-499A-8F49-13DD7B84CBD6} = {BCB89F56-5AD3-4384-BAB6-524165AF612A}
 	EndGlobalSection
 EndGlobal
