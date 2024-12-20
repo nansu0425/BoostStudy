@@ -1,4 +1,4 @@
-﻿// Daytime.4 - A synchronous UDP daytime server
+﻿// Daytime.4 - A synchronous UDP daytime client
 
 #include <array>
 #include <iostream>
