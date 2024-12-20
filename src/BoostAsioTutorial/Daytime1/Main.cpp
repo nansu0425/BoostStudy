@@ -18,13 +18,13 @@ int main(int argc, char* argv[])
 
         boost::asio::io_context ioContext;
         
-        // host 이름과 서비스 이름을 묶어 엔드 포인트 리스트로 만든다
-        // 엔드 포인트 리스트는 IPv4, Ipv6 엔드 포인트를 모두 포함한다
+        // host 이름과 서비스 이름을 엔드 포인트의 IP번호와 포트 번호로 변환
+        // 엔드 포인트 리스트 형태로 저장되고 IPv4, Ipv6 엔트리 모두 존재할 수 있다
         tcp::resolver resolver(ioContext);
         tcp::resolver::results_type endpoints = resolver.resolve(argv[1], "Daytime");
         
         // 소켓을 생성하고 엔드 포인트에 연결한다
-        // IPv4, IPv6 엔드 포인트에 모두 연결을 시도한다
+        // 모든 엔드 포인트에 대해 연결을 시도한다
         tcp::socket socket(ioContext);
         boost::asio::connect(socket, endpoints);
 
