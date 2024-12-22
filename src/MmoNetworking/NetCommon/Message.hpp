@@ -12,7 +12,7 @@ namespace NetCommon
 
         friend std::ostream& operator<<(std::ostream& os, const MessageHeader<TMessageId>& header)
         {
-            os << "[id = " << static_cast<int>(header.id) << " | size = " << header.size << "]";
+            os << "[id = " << static_cast<uint32_t>(header.id) << " | size = " << header.size << "]";
 
             return os;
         }
@@ -31,7 +31,10 @@ namespace NetCommon
 
         friend std::ostream& operator<<(std::ostream& os, const Message<TMessageId>& message)
         {
-            os << message.header;
+            os << "Header:\n" << message.header << std::endl;
+            
+            os << "Payload:\n";
+            os << "[size = " << message.payload.size() << "]";
 
             return os;
         }
