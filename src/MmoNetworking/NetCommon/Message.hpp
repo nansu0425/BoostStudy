@@ -7,8 +7,8 @@ namespace NetCommon
     template<typename TMessageId>
     struct MessageHeader
     {
-        TMessageId id;
-        uint32_t size = 0;
+        TMessageId id = TMessageId();
+        uint32_t size = sizeof(MessageHeader);
 
         friend std::ostream& operator<<(std::ostream& os, const MessageHeader<TMessageId>& header)
         {
@@ -42,10 +42,12 @@ namespace NetCommon
         {
             static_assert(std::is_standard_layout<TData>::value, "Tdata must be standard-layout type");
 
-            size_t offsetData = message.GetSize();
+            size_t offsetData = message.payload.size();
 
             message.payload.resize(message.payload.size() + sizeof(TData));
             std::memcpy(message.payload.data() + offsetData, &data, sizeof(TData));
+
+            message.header.size = static_cast<uint32_t>(message.GetSize());
 
             return message;
         }
@@ -56,10 +58,12 @@ namespace NetCommon
         {
             static_assert(std::is_standard_layout<TData>::value, "Tdata must be standard-layout type");
 
-            size_t offsetData = message.GetSize() - sizeof(TData);
+            size_t offsetData = message.payload.size() - sizeof(TData);
             
-            std::memcpy(&data, message.payload.data() + offsetData, sizeof(Tdata));
+            std::memcpy(&data, message.payload.data() + offsetData, sizeof(TData));
             message.payload.resize(offsetData);
+
+            message.header.size = static_cast<uint32_t>(message.GetSize());
 
             return message;
         }
