@@ -20,7 +20,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Message.hpp" />
-    <ClInclude Include="NetCommon.hpp" />
+    <ClInclude Include="Include.hpp" />
     <ClInclude Include="Pch.hpp" />
   </ItemGroup>
   <ItemGroup>

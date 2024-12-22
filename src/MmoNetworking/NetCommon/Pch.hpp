@@ -1,3 +1,3 @@
 ﻿#pragma once
 
-#include <NetCommon/NetCommon.hpp>
+#include <NetCommon/Include.hpp>
