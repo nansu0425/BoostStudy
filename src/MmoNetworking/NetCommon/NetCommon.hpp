@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cstdint>
+#include <cstddef>
 
 #ifdef _WIN32
 #define WINVER          0x0A00
