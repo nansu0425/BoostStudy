@@ -31,6 +31,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "MmoNetworking", "MmoNetwork
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "SimpleExample", "src\MmoNetworking\SimpleExample\SimpleExample.vcxproj", "{C2FA9676-C424-4652-8295-4428B0771FA5}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "NetCommon", "src\MmoNetworking\NetCommon\NetCommon.vcxproj", "{EBDD8A99-B802-49A4-BC51-6635352723F7}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -135,6 +137,14 @@ Global
 		{C2FA9676-C424-4652-8295-4428B0771FA5}.Release|x64.Build.0 = Release|x64
 		{C2FA9676-C424-4652-8295-4428B0771FA5}.Release|x86.ActiveCfg = Release|Win32
 		{C2FA9676-C424-4652-8295-4428B0771FA5}.Release|x86.Build.0 = Release|Win32
+		{EBDD8A99-B802-49A4-BC51-6635352723F7}.Debug|x64.ActiveCfg = Debug|x64
+		{EBDD8A99-B802-49A4-BC51-6635352723F7}.Debug|x64.Build.0 = Debug|x64
+		{EBDD8A99-B802-49A4-BC51-6635352723F7}.Debug|x86.ActiveCfg = Debug|Win32
+		{EBDD8A99-B802-49A4-BC51-6635352723F7}.Debug|x86.Build.0 = Debug|Win32
+		{EBDD8A99-B802-49A4-BC51-6635352723F7}.Release|x64.ActiveCfg = Release|x64
+		{EBDD8A99-B802-49A4-BC51-6635352723F7}.Release|x64.Build.0 = Release|x64
+		{EBDD8A99-B802-49A4-BC51-6635352723F7}.Release|x86.ActiveCfg = Release|Win32
+		{EBDD8A99-B802-49A4-BC51-6635352723F7}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -152,5 +162,6 @@ Global
 		{58A4E84A-8F71-4A08-ACB7-C7D896DF8EA3} = {BCB89F56-5AD3-4384-BAB6-524165AF612A}
 		{CFD294FD-E6F7-4ED1-8F04-16A9C6CB248D} = {BCB89F56-5AD3-4384-BAB6-524165AF612A}
 		{C2FA9676-C424-4652-8295-4428B0771FA5} = {1EE4DEA8-D706-4114-A2FA-A016639D7B40}
+		{EBDD8A99-B802-49A4-BC51-6635352723F7} = {1EE4DEA8-D706-4114-A2FA-A016639D7B40}
 	EndGlobalSection
 EndGlobal
