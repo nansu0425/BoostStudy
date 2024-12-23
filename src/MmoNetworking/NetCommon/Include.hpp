@@ -3,7 +3,7 @@
 #include <memory>
 #include <thread>
 #include <mutex>
-#include <deque>
+#include <queue>
 #include <optional>
 #include <vector>
 #include <iostream>

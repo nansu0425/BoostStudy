@@ -22,6 +22,7 @@
     <ClInclude Include="Message.hpp" />
     <ClInclude Include="Include.hpp" />
     <ClInclude Include="Pch.hpp" />
+    <ClInclude Include="TcpConnection.hpp" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Pch.cpp">

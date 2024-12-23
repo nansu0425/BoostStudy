@@ -1,6 +1,6 @@
 ﻿#pragma once
 
-#include <NetCommon/Pch.hpp>
+#include <NetCommon/Include.hpp>
 
 namespace NetCommon
 {
