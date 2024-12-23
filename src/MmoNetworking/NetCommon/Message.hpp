@@ -71,4 +71,21 @@ namespace NetCommon
             return message;
         }
     };
+
+    template<typename TMessageId>
+    class TcpConnection;
+
+    template<typename TMessageId>
+    struct OwnedMessage
+    {
+        std::shared_ptr<TcpConnection<TMessageId>> pOwner = nullptr;
+        Message<TMessageId> message;
+
+        friend std::ostream& operator<<(std::ostream& os, const OwnedMessage<TMessageId>& ownedMessage)
+        {
+            os << ownedMessage.message;
+
+            return os;
+        }
+    };
 }
