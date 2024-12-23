@@ -19,6 +19,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Client.hpp" />
     <ClInclude Include="Message.hpp" />
     <ClInclude Include="Include.hpp" />
     <ClInclude Include="Pch.hpp" />
