@@ -19,9 +19,9 @@ namespace NetCommon
         using Pointer       = std::shared_ptr<TcpConnection>;
 
         static Pointer Create(boost::asio::io_context& ioContext,
-                              std::queue<OwnedMessage>& receiveMessages)
+                              std::queue<OwnedMessage>& _messagesReceived)
         {
-            return Pointer(new TcpConnection(ioContext, receiveMessages));
+            return Pointer(new TcpConnection(ioContext, _messagesReceived));
         }
 
         bool IsConnected()
@@ -41,18 +41,18 @@ namespace NetCommon
 
     private:
         TcpConnection(boost::asio::io_context& ioContext,
-                      std::queue<OwnedMessage>& receiveMessages)
+                      std::queue<OwnedMessage>& _messagesReceived)
             : _strand(boost::asio::make_strand(ioContext))
             , _socket(ioContext)
-            , _receiveMessages(receiveMessages)
+            , _messagesReceived(_messagesReceived)
         {}
 
     protected:
         Strand                          _strand;
         Tcp::socket                     _socket;
         Tcp::resolver::results_type     _endpoints;
-        std::queue<Message>             _sendMessages;
-        std::queue<OwnedMessage>&       _receiveMessages;
+        std::queue<Message>             _messagesSend;
+        std::queue<OwnedMessage>&       _messagesReceived;
         
     };
 }
