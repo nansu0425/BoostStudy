@@ -6,7 +6,7 @@
 namespace NetCommon
 {
     template<typename TMessageId>
-    class IClient
+    class ClientBase
     {
     private:
         using ConnectionPointer     = typename TcpConnection<TMessageId>::Pointer;
@@ -15,9 +15,9 @@ namespace NetCommon
         using Message               = Message<TMessageId>;
 
     public:
-        IClient() = default;
+        ClientBase() = default;
         
-        virtual ~IClient()
+        virtual ~ClientBase()
         {
             Disconnect();
             _ioContext.stop();
@@ -41,7 +41,7 @@ namespace NetCommon
             }
             catch (const std::exception&)
             {
-                std::cerr << "IClient: Connect: ";
+                std::cerr << "[CLIENT] Failed to connect\n";
                 throw;
             }
         }

@@ -1,6 +1,6 @@
 ﻿#include <Client/Pch.hpp>
 #include <NetCommon/Message.hpp>
-#include <NetCommon/ClientInterface.hpp>
+#include <NetCommon/ClientBase.hpp>
 
 enum class MessageId : uint32_t
 {
@@ -9,7 +9,7 @@ enum class MessageId : uint32_t
     FireBullet,
 };
 
-class Client : public NetCommon::IClient<MessageId>
+class Client : public NetCommon::ClientBase<MessageId>
 {
 public:
     bool FireBullet(float x, float y)
