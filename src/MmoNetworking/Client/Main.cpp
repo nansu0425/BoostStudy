@@ -1,6 +1,6 @@
 ﻿#include <Client/Pch.hpp>
 #include <NetCommon/Message.hpp>
-#include <NetCommon/Client.hpp>
+#include <NetCommon/ClientInterface.hpp>
 
 enum class MessageId : uint32_t
 {

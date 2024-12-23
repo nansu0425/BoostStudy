@@ -5,7 +5,7 @@
     <ClInclude Include="Message.hpp" />
     <ClInclude Include="Pch.hpp" />
     <ClInclude Include="TcpConnection.hpp" />
-    <ClInclude Include="Client.hpp" />
+    <ClInclude Include="ClientInterface.hpp" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Pch.cpp" />
