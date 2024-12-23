@@ -1,7 +1,6 @@
 ﻿#pragma once
 
 #include <NetCommon/Include.hpp>
-#include <NetCommon/Message.hpp>
 #include <NetCommon/TcpConnection.hpp>
 
 namespace NetCommon
