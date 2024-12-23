@@ -34,10 +34,10 @@ namespace NetCommon
         {
             try
             {
-                _pConnection = TcpConnection<TMessageId>::Create(_ioContext, _messagesReceived);
+                _pServer = TcpConnection<TMessageId>::Create(_ioContext, _messagesReceived);
 
                 Tcp::resolver resolver(_ioContext);
-                _pConnection->ConnectToServer(resolver.resolve(host, service));
+                _pServer->ConnectToServer(resolver.resolve(host, service));
             }
             catch (const std::exception&)
             {
@@ -50,15 +50,15 @@ namespace NetCommon
         {
             if (IsConnected())
             {
-                _pConnection->Disconnect();
+                _pServer->Disconnect();
             }
         }
 
         bool IsConnected()
         {
-            if (_pConnection != nullptr)
+            if (_pServer != nullptr)
             {
-                return _pConnection->IsConnected();
+                return _pServer->IsConnected();
             }
             else
             {
@@ -79,7 +79,7 @@ namespace NetCommon
     protected:
         boost::asio::io_context     _ioContext;
         std::thread                 _worker;
-        ConnectionPointer           _pConnection;
+        ConnectionPointer           _pServer;
 
     private:
         std::queue<OwnedMessage>    _messagesReceived;
