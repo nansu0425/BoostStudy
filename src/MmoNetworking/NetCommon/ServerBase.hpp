@@ -7,7 +7,7 @@ namespace NetCommon
     template<typename TMessageId>
     class ServerBase
     {
-    private:
+    protected:
         using ConnectionPointer     = typename TcpConnection<TMessageId>::Pointer;
         using Tcp                   = boost::asio::ip::tcp;
         using OwnedMessage          = OwnedMessage<TMessageId>;
@@ -16,8 +16,8 @@ namespace NetCommon
         using ConnectionMap         = std::unordered_map<ConnectionId, ConnectionPointer>;
 
     public:
-        ServerBase(boost::asio::ip::port_type port)
-            : _acceptor(_ioContext, Tcp::endpoint(Tcp::v4, port))
+        ServerBase(uint16_t port)
+            : _acceptor(_ioContext, Tcp::endpoint(Tcp::v4(), port))
         {}
 
         virtual ~ServerBase()
@@ -118,7 +118,7 @@ namespace NetCommon
                 OwnedMessage ownedMessage = _messagesReceived.front();
                 _messagesReceived.pop();
 
-                OnReceive(ownedMessage->pOwner, ownedMessage->message);
+                OnReceive(ownedMessage.pOwner, ownedMessage.message);
             }
         }
 
@@ -134,7 +134,7 @@ namespace NetCommon
 
             if (!error)
             {
-                std::cout << "[SERVER] New connection: " << pClient->Socket()->remote_endpoint() << "\n";
+                std::cout << "[SERVER] New connection: " << pClient->Socket().remote_endpoint() << "\n";
 
                 if (OnConnect(pClient))
                 {
@@ -156,9 +156,6 @@ namespace NetCommon
 
             Listen();
         }
-
-        void HandleReceive(ConnectionPointer pClient, Message& message)
-        {}
 
     protected:
         boost::asio::io_context         _ioContext;
