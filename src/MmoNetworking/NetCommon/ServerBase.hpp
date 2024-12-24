@@ -1,6 +1,5 @@
 ﻿#pragma once
 
-#include <NetCommon/Include.hpp>
 #include <NetCommon/TcpConnection.hpp>
 
 namespace NetCommon
@@ -167,9 +166,9 @@ namespace NetCommon
         Tcp::acceptor                   _acceptor;
         ConnectionId                    _nextClientId = 10000;
         ConnectionMap                   _clients;
-        
 
     private:
         std::queue<OwnedMessage>        _messagesReceived;
+
     };
 }
