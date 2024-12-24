@@ -19,10 +19,11 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="ClientInterface.hpp" />
+    <ClInclude Include="ClientBase.hpp" />
     <ClInclude Include="Message.hpp" />
     <ClInclude Include="Include.hpp" />
     <ClInclude Include="Pch.hpp" />
+    <ClInclude Include="ServerBase.hpp" />
     <ClInclude Include="TcpConnection.hpp" />
   </ItemGroup>
   <ItemGroup>

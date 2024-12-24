@@ -1,11 +1,13 @@
 ﻿#pragma once
 
+#include <cassert>
 #include <memory>
 #include <thread>
 #include <mutex>
 #include <queue>
 #include <optional>
 #include <vector>
+#include <unordered_map>
 #include <iostream>
 #include <algorithm>
 #include <chrono>
