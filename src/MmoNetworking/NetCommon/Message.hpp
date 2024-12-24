@@ -4,6 +4,8 @@
 
 namespace NetCommon
 {
+    using MessageId = uint32_t;
+
     template<typename TMessageId>
     struct MessageHeader
     {
@@ -12,7 +14,7 @@ namespace NetCommon
 
         friend std::ostream& operator<<(std::ostream& os, const MessageHeader<TMessageId>& header)
         {
-            os << "[id = " << static_cast<uint32_t>(header.id) << " | size = " << header.size << "]";
+            os << "[id = " << static_cast<MessageId>(header.id) << " | size = " << header.size << "]";
 
             return os;
         }
