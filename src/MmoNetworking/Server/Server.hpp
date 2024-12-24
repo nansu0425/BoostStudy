@@ -19,13 +19,13 @@ public:
     {}
 
 protected:
-    virtual bool OnConnect(ConnectionPointer pClient) override
+    virtual bool OnClientConnected(ConnectionPointer pClient) override
     {
         return true;
     }
 
-    virtual void OnDisconnect(ConnectionPointer pClient) override
+    virtual void OnClientDisconnected(ConnectionPointer pClient) override
     {}
-    virtual void OnReceive(ConnectionPointer pClient, Message& message) override
+    virtual void OnMessageReceived(ConnectionPointer pClient, Message& message) override
     {}
 };

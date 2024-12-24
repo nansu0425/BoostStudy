@@ -1,6 +1,5 @@
 ﻿#pragma once
 
-#include <NetCommon/Include.hpp>
 #include <NetCommon/TcpConnection.hpp>
 
 namespace NetCommon
@@ -13,6 +12,7 @@ namespace NetCommon
         using Tcp                   = boost::asio::ip::tcp;
         using OwnedMessage          = OwnedMessage<TMessageId>;
         using Message               = Message<TMessageId>;
+        using OwnerType             = typename TcpConnection<TMessageId>::OwnerType;
 
     public:
         ClientBase() = default;
@@ -34,10 +34,12 @@ namespace NetCommon
         {
             try
             {
-                _pServer = TcpConnection<TMessageId>::Create(_ioContext, _messagesReceived);
+                _pServer = TcpConnection<TMessageId>::Create(OwnerType::Client,
+                                                             _ioContext,
+                                                             _messagesReceived);
 
                 Tcp::resolver resolver(_ioContext);
-                _pServer->ConnectToServer(resolver.resolve(host, service));
+                _pServer->OnServerConnected();
             }
             catch (const std::exception&)
             {

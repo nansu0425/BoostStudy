@@ -19,30 +19,45 @@ namespace NetCommon
         using Pointer       = std::shared_ptr<TcpConnection>;
         using Id            = uint32_t;
 
-        static Pointer Create(boost::asio::io_context& ioContext,
-                              std::queue<OwnedMessage>& _messagesReceived)
+        enum class OwnerType
         {
-            return Pointer(new TcpConnection(ioContext, _messagesReceived));
+            Server,
+            Client,
+        };
+
+    public:
+        static Pointer Create(OwnerType ownerType,
+                              boost::asio::io_context& ioContext,
+                              std::queue<OwnedMessage>& messagesReceived)
+        {
+            return Pointer(new TcpConnection(ownerType, ioContext, messagesReceived));
         }
 
-        bool IsConnected()
+        bool IsConnected() const
         {
-            return false;
+            boost::system::error_code error;
+            _socket.remote_endpoint(error);
+
+            return !error;
         }
 
-        void ConnectToServer(Tcp::resolver::results_type&& endpoints)
+        // Called when the client successfully connects to the server
+        void OnServerConnected()
         {
-            _endpoints = std::move(endpoints);
+            assert(_ownerType == OwnerType::Client);
         }
 
-        void ConnectToClient(uint32_t clientId)
+        // Called when a new client connection is accepted on the server
+        void OnClientConnected(uint32_t clientId)
         {
-            _id = clientId;
+            assert(_ownerType == OwnerType::Server);
+            assert(IsConnected());
+
+            SetId(clientId);
         }
 
         void Disconnect()
         {
-
         }
 
         Tcp::socket& Socket()
@@ -61,18 +76,20 @@ namespace NetCommon
         }
 
     private:
-        TcpConnection(boost::asio::io_context& ioContext,
+        TcpConnection(OwnerType ownerType, 
+                      boost::asio::io_context& ioContext,
                       std::queue<OwnedMessage>& _messagesReceived)
-            : _strand(boost::asio::make_strand(ioContext))
+            : _ownerType(ownerType)
+            , _strand(boost::asio::make_strand(ioContext))
             , _socket(ioContext)
             , _messagesReceived(_messagesReceived)
         {}
 
     protected:
-        Id                              _id;
+        Id                              _id = -1;
+        OwnerType                       _ownerType;
         Strand                          _strand;
         Tcp::socket                     _socket;
-        Tcp::resolver::results_type     _endpoints;
         std::queue<Message>             _messagesSend;
         std::queue<OwnedMessage>&       _messagesReceived;
 

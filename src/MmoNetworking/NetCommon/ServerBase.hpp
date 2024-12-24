@@ -14,6 +14,7 @@ namespace NetCommon
         using Message               = Message<TMessageId>;
         using ConnectionId          = typename TcpConnection<TMessageId>::Id;
         using ConnectionMap         = std::unordered_map<ConnectionId, ConnectionPointer>;
+        using OwnerType             = typename TcpConnection<TMessageId>::OwnerType;
 
     public:
         ServerBase(uint16_t port)
@@ -29,7 +30,7 @@ namespace NetCommon
         {
             try
             {
-                Listen();
+                StartAccept();
 
                 _worker = std::thread([this]()
                                       {
@@ -55,18 +56,6 @@ namespace NetCommon
             }
         }
 
-        void Listen()
-        {
-            ConnectionPointer pClient = TcpConnection<TMessageId>::Create(_ioContext, _messagesReceived);
-            assert(pClient != nullptr);
-
-            _acceptor.async_accept(pClient->Socket(),
-                                   [this, pClient](const boost::system::error_code& error)
-                                   {
-                                       HandleConnect(pClient, error);
-                                   });
-        }
-
         void Send(ConnectionPointer pClient, const Message& message)
         {
             assert(pClient != nullptr);
@@ -77,7 +66,7 @@ namespace NetCommon
             }
             else
             {
-                OnDisconnect(pClient);
+                OnClientDisconnected(pClient);
                 _clients.erase(pClient->GetId());
             }
         }
@@ -100,7 +89,7 @@ namespace NetCommon
                 }
                 else
                 {
-                    OnDisconnect(pClient);
+                    OnClientDisconnected(pClient);
                     iter = _clients.erase(iter);
                 }
             }
@@ -118,17 +107,31 @@ namespace NetCommon
                 OwnedMessage ownedMessage = _messagesReceived.front();
                 _messagesReceived.pop();
 
-                OnReceive(ownedMessage.pOwner, ownedMessage.message);
+                OnMessageReceived(ownedMessage.pOwner, ownedMessage.message);
             }
         }
 
     protected:
-        virtual bool OnConnect(ConnectionPointer pClient) = 0;
-        virtual void OnDisconnect(ConnectionPointer pClient) = 0;
-        virtual void OnReceive(ConnectionPointer pClient, Message& message) = 0;
+        virtual bool OnClientConnected(ConnectionPointer pClient) = 0;
+        virtual void OnClientDisconnected(ConnectionPointer pClient) = 0;
+        virtual void OnMessageReceived(ConnectionPointer pClient, Message& message) = 0;
 
     private:
-        void HandleConnect(ConnectionPointer pClient, const boost::system::error_code& error)
+        void StartAccept()
+        {
+            ConnectionPointer pClient = TcpConnection<TMessageId>::Create(OwnerType::Server,
+                                                                          _ioContext,
+                                                                          _messagesReceived);
+            assert(pClient != nullptr);
+
+            _acceptor.async_accept(pClient->Socket(),
+                                   [this, pClient](const boost::system::error_code& error)
+                                   {
+                                       HandleAccept(pClient, error);
+                                   });
+        }
+
+        void HandleAccept(ConnectionPointer pClient, const boost::system::error_code& error)
         {
             assert(pClient != nullptr);
 
@@ -136,9 +139,9 @@ namespace NetCommon
             {
                 std::cout << "[SERVER] New connection: " << pClient->Socket().remote_endpoint() << "\n";
 
-                if (OnConnect(pClient))
+                if (OnClientConnected(pClient))
                 {
-                    pClient->SetId(_nextClientId);
+                    pClient->OnClientConnected(_nextClientId);
                     _clients[_nextClientId] = std::move(pClient);
 
                     std::cout << "[" << _nextClientId << "] Connection approved\n";
@@ -154,7 +157,7 @@ namespace NetCommon
                 std::cerr << "[SERVER] Failed to connect: " << error << "\n";
             }
 
-            Listen();
+            StartAccept();
         }
 
     protected:
