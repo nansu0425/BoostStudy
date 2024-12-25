@@ -10,7 +10,7 @@ namespace NetCommon
         : public std::enable_shared_from_this<TcpConnection<TMessageId>>
     {
     private:
-        using Tcp           = typename boost::asio::ip::tcp;
+        using Tcp           = boost::asio::ip::tcp;
         using Strand        = boost::asio::strand<boost::asio::io_context::executor_type>;
         using Message       = Message<TMessageId>;
         using MessageHeader = MessageHeader<TMessageId>;
@@ -50,16 +50,31 @@ namespace NetCommon
         }
 
         // Called when a new client connection is accepted on the server
-        void OnClientConnected(uint32_t clientId)
+        void OnClientConnected(Id clientId)
         {
             assert(_ownerType == OwnerType::Server);
             assert(IsConnected());
 
             SetId(clientId);
+            StartReadHeader();
         }
 
         void Disconnect()
         {
+        }
+
+        void Send(const Message& writeMessage)
+        {
+            boost::asio::post(_strand,
+                              [wpSelf = this->weak_from_this(), writeMessage]()
+                              {
+                                  auto spSelf = wpSelf.lock();
+
+                                  if (spSelf != nullptr)
+                                  {
+                                      spSelf->HandleSend(writeMessage);
+                                  }
+                              });
         }
 
         Tcp::socket& Socket()
@@ -158,6 +173,18 @@ namespace NetCommon
             {
                 std::cerr << "[" << _id << "] Failed to read payload: " << error << "\n";
                 _socket.close();
+            }
+        }
+
+        void HandleSend(const Message& writeMessage)
+        {
+            bool isWritingMessage = !_sendBuffer.empty();
+
+            _sendBuffer.push(writeMessage);
+
+            if (!isWritingMessage)
+            {
+                StartWriteHeader();
             }
         }
 
