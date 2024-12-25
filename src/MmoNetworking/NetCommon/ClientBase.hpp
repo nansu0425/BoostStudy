@@ -36,7 +36,7 @@ namespace NetCommon
             {
                 _pServer = TcpConnection<TMessageId>::Create(OwnerType::Client,
                                                              _ioContext,
-                                                             _messagesReceived);
+                                                             _receiveBuffer);
 
                 Tcp::resolver resolver(_ioContext);
                 _pServer->OnServerConnected();
@@ -73,9 +73,9 @@ namespace NetCommon
 
         }
 
-        std::queue<OwnedMessage>& ReceiveMessages()
+        std::queue<OwnedMessage>& ReceiveBuffer()
         {
-            return _messagesReceived;
+            return _receiveBuffer;
         }
 
     protected:
@@ -84,6 +84,6 @@ namespace NetCommon
         ConnectionPointer           _pServer;
 
     private:
-        std::queue<OwnedMessage>    _messagesReceived;
+        std::queue<OwnedMessage>    _receiveBuffer;
     };
 }

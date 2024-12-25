@@ -99,13 +99,13 @@ namespace NetCommon
         {
             for (size_t messageCount = 0; messageCount < nMaxMessages; ++messageCount)
             {
-                if (_messagesReceived.empty())
+                if (_receiveBuffer.empty())
                 {
                     break;
                 }
 
-                OwnedMessage ownedMessage = _messagesReceived.front();
-                _messagesReceived.pop();
+                OwnedMessage ownedMessage = _receiveBuffer.front();
+                _receiveBuffer.pop();
 
                 OnMessageReceived(ownedMessage.pOwner, ownedMessage.message);
             }
@@ -121,7 +121,7 @@ namespace NetCommon
         {
             ConnectionPointer pClient = TcpConnection<TMessageId>::Create(OwnerType::Server,
                                                                           _ioContext,
-                                                                          _messagesReceived);
+                                                                          _receiveBuffer);
             assert(pClient != nullptr);
 
             _acceptor.async_accept(pClient->Socket(),
@@ -168,7 +168,7 @@ namespace NetCommon
         ConnectionMap                   _clients;
 
     private:
-        std::queue<OwnedMessage>        _messagesReceived;
+        std::queue<OwnedMessage>        _receiveBuffer;
 
     };
 }

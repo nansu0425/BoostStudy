@@ -26,7 +26,7 @@ namespace NetCommon
         MessageHeader<TMessageId> header;
         std::vector<std::byte> payload;
 
-        size_t GetSize() const
+        size_t CalculateSize() const
         {
             return sizeof(MessageHeader<TMessageId>) + payload.size();
         }
@@ -52,7 +52,7 @@ namespace NetCommon
             message.payload.resize(message.payload.size() + sizeof(TData));
             std::memcpy(message.payload.data() + offsetData, &data, sizeof(TData));
 
-            message.header.size = static_cast<uint32_t>(message.GetSize());
+            message.header.size = static_cast<uint32_t>(message.CalculateSize());
 
             return message;
         }
@@ -68,7 +68,7 @@ namespace NetCommon
             std::memcpy(&data, message.payload.data() + offsetData, sizeof(TData));
             message.payload.resize(offsetData);
 
-            message.header.size = static_cast<uint32_t>(message.GetSize());
+            message.header.size = static_cast<uint32_t>(message.CalculateSize());
 
             return message;
         }
