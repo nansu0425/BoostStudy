@@ -8,12 +8,12 @@ namespace NetCommon
     class ServerBase
     {
     protected:
-        using ConnectionPointer     = typename TcpConnection<TMessageId>::Pointer;
+        using ClientPointer         = typename TcpConnection<TMessageId>::Pointer;
         using Tcp                   = boost::asio::ip::tcp;
         using OwnedMessage          = OwnedMessage<TMessageId>;
         using Message               = Message<TMessageId>;
-        using ConnectionId          = typename TcpConnection<TMessageId>::Id;
-        using ConnectionMap         = std::unordered_map<ConnectionId, ConnectionPointer>;
+        using ClientId              = typename TcpConnection<TMessageId>::Id;
+        using ClientMap             = std::unordered_map<ClientId, ClientPointer>;
         using OwnerType             = typename TcpConnection<TMessageId>::OwnerType;
 
     public:
@@ -56,7 +56,7 @@ namespace NetCommon
             }
         }
 
-        void Send(ConnectionPointer pClient, const Message& message)
+        void Send(ClientPointer pClient, const Message& message)
         {
             assert(pClient != nullptr);
 
@@ -71,11 +71,11 @@ namespace NetCommon
             }
         }
 
-        void Broadcast(const Message& message, ConnectionPointer pIgnoredClient = nullptr)
+        void Broadcast(const Message& message, ClientPointer pIgnoredClient = nullptr)
         {
             for (auto iter = _clients.begin(); iter != _clients.end();)
             {
-                ConnectionPointer pClient = *iter.second;
+                ClientPointer pClient = *iter.second;
                 assert(pClient != nullptr);
 
                 if (pClient->IsConnected())
@@ -112,16 +112,16 @@ namespace NetCommon
         }
 
     protected:
-        virtual bool OnClientConnected(ConnectionPointer pClient) = 0;
-        virtual void OnClientDisconnected(ConnectionPointer pClient) = 0;
-        virtual void OnMessageReceived(ConnectionPointer pClient, Message& message) = 0;
+        virtual bool OnClientConnected(ClientPointer pClient) = 0;
+        virtual void OnClientDisconnected(ClientPointer pClient) = 0;
+        virtual void OnMessageReceived(ClientPointer pClient, Message& message) = 0;
 
     private:
         void StartAccept()
         {
-            ConnectionPointer pClient = TcpConnection<TMessageId>::Create(OwnerType::Server,
-                                                                          _ioContext,
-                                                                          _receiveBuffer);
+            ClientPointer pClient = TcpConnection<TMessageId>::Create(OwnerType::Server,
+                                                                      _ioContext,
+                                                                      _receiveBuffer);
             assert(pClient != nullptr);
 
             _acceptor.async_accept(pClient->Socket(),
@@ -131,13 +131,13 @@ namespace NetCommon
                                    });
         }
 
-        void HandleAccept(ConnectionPointer pClient, const boost::system::error_code& error)
+        void HandleAccept(ClientPointer pClient, const boost::system::error_code& error)
         {
             assert(pClient != nullptr);
 
             if (!error)
             {
-                std::cout << "[SERVER] New connection: " << pClient->Socket().remote_endpoint() << "\n";
+                std::cout << "[SERVER] New client: " << pClient->Socket().remote_endpoint() << "\n";
 
                 if (OnClientConnected(pClient))
                 {
@@ -154,7 +154,7 @@ namespace NetCommon
             }
             else
             {
-                std::cerr << "[SERVER] Failed to connect: " << error << "\n";
+                std::cerr << "[SERVER] Failed to accept: " << error << "\n";
             }
 
             StartAccept();
@@ -164,8 +164,8 @@ namespace NetCommon
         boost::asio::io_context         _ioContext;
         std::thread                     _worker;
         Tcp::acceptor                   _acceptor;
-        ConnectionId                    _nextClientId = 10000;
-        ConnectionMap                   _clients;
+        ClientId                        _nextClientId = 10000;
+        ClientMap                       _clients;
 
     private:
         std::queue<OwnedMessage>        _receiveBuffer;
