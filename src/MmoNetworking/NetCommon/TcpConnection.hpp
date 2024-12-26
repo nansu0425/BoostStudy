@@ -107,16 +107,17 @@ namespace NetCommon
             boost::asio::async_read(_socket,
                                     boost::asio::buffer(&_readMessage.header,
                                                         sizeof(MessageHeader)),
-                                    [wpSelf = this->weak_from_this()](const ErrorCode& error,
-                                                                     const size_t nBytesTransferred)
-                                    {
-                                        auto spSelf = wpSelf.lock();
+                                    boost::asio::bind_executor(_strand,
+                                                               [wpSelf = this->weak_from_this()](const ErrorCode& error,
+                                                                                                 const size_t nBytesTransferred)
+                                                               {
+                                                                   auto spSelf = wpSelf.lock();
 
-                                        if (spSelf != nullptr)
-                                        {
-                                            spSelf->HandleReadHeader(error, nBytesTransferred);
-                                        }
-                                    });
+                                                                   if (spSelf != nullptr)
+                                                                   {
+                                                                       spSelf->HandleReadHeader(error, nBytesTransferred);
+                                                                   }
+                                                               }));
         }
 
         void HandleReadHeader(const ErrorCode& error, const size_t nBytesTransferred)
@@ -149,16 +150,17 @@ namespace NetCommon
             boost::asio::async_read(_socket,
                                     boost::asio::buffer(_readMessage.payload.data(),
                                                         _readMessage.payload.size()),
-                                    [wpSelf = this->weak_from_this()](const ErrorCode& error,
-                                                                      const size_t nBytesTransferred)
-                                    {
-                                        auto spSelf = wpSelf.lock();
+                                    boost::asio::bind_executor(_strand,
+                                                               [wpSelf = this->weak_from_this()](const ErrorCode& error,
+                                                                                                 const size_t nBytesTransferred)
+                                                               {
+                                                                   auto spSelf = wpSelf.lock();
 
-                                        if (spSelf != nullptr)
-                                        {
-                                            spSelf->HandleReadPayload(error, nBytesTransferred);
-                                        }
-                                    });
+                                                                   if (spSelf != nullptr)
+                                                                   {
+                                                                       spSelf->HandleReadPayload(error, nBytesTransferred);
+                                                                   }
+                                                               }));
         }
 
         void HandleReadPayload(const ErrorCode& error, const size_t nBytesTransferred)
@@ -191,17 +193,19 @@ namespace NetCommon
         void StartWriteHeader()
         {
             boost::asio::async_write(_socket,
-                                     boost::asio::buffer(&_sendBuffer.front().header, sizeof(MessageHeader)),
-                                     [wpSelf = this->weak_from_this()](const ErrorCode& error,
-                                                                       const size_t nBytesTransferred)
-                                     {
-                                         auto spSelf = wpSelf.lock();
+                                     boost::asio::buffer(&_sendBuffer.front().header, 
+                                                         sizeof(MessageHeader)),
+                                     boost::asio::bind_executor(_strand,
+                                                                [wpSelf = this->weak_from_this()](const ErrorCode& error,
+                                                                                                  const size_t nBytesTransferred)
+                                                                {
+                                                                    auto spSelf = wpSelf.lock();
 
-                                         if (spSelf != nullptr)
-                                         {
-                                             spSelf->HandleWriteHeader(error, nBytesTransferred);
-                                         }
-                                     });
+                                                                    if (spSelf != nullptr)
+                                                                    {
+                                                                        spSelf->HandleWriteHeader(error, nBytesTransferred);
+                                                                    }
+                                                                }));
         }
 
         void HandleWriteHeader(const ErrorCode& error, const size_t nBytesTransferred)
@@ -232,16 +236,17 @@ namespace NetCommon
             boost::asio::async_write(_socket,
                                      boost::asio::buffer(_sendBuffer.front().payload.data(),
                                                          _sendBuffer.front().payload.size()),
-                                     [wpSelf = this->weak_from_this()](const ErrorCode& error,
-                                                                       const size_t nBytesTransferred)
-                                     {
-                                         auto spSelf = wpSelf.lock();
+                                     boost::asio::bind_executor(_strand,
+                                                                [wpSelf = this->weak_from_this()](const ErrorCode& error,
+                                                                                                  const size_t nBytesTransferred)
+                                                                {
+                                                                    auto spSelf = wpSelf.lock();
 
-                                         if (spSelf != nullptr)
-                                         {
-                                             HandleWritePayload(error, nBytesTransferred);
-                                         }
-                                     });
+                                                                    if (spSelf != nullptr)
+                                                                    {
+                                                                        HandleWritePayload(error, nBytesTransferred);
+                                                                    }
+                                                                }));
         }
 
         void HandleWritePayload(const ErrorCode& error, const size_t nBytesTransferred)
