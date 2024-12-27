@@ -1,12 +1,12 @@
 ﻿#include <Server/Pch.hpp>
-#include <Server/Server.hpp>
+#include <Server/Service.hpp>
 
 int main()
 {
-    Server server(60000);
-    server.Start();
+    Server::Service service(60000);
+    service.Start();
 
-    while (server.Update())
+    while (service.Update())
     { }
 
     return 0;
