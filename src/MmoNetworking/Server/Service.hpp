@@ -1,15 +1,15 @@
 ﻿#pragma once
 
-#include <NetCommon/ServerBase.hpp>
+#include <NetCommon/ServerServiceBase.hpp>
 #include <Server/MessageId.hpp>
 
 namespace Server
 {
-    class Service : public NetCommon::ServerBase<MessageId>
+    class Service : public NetCommon::ServerServiceBase<MessageId>
     {
     public:
         Service(uint16_t port)
-            : NetCommon::ServerBase<MessageId>(port)
+            : NetCommon::ServerServiceBase<MessageId>(port)
         {}
 
     protected:

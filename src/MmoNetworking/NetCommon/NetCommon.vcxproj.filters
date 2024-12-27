@@ -6,7 +6,7 @@
     <ClInclude Include="Pch.hpp" />
     <ClInclude Include="TcpConnection.hpp" />
     <ClInclude Include="ClientBase.hpp" />
-    <ClInclude Include="ServerBase.hpp" />
+    <ClInclude Include="ServerServiceBase.hpp" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Pch.cpp" />

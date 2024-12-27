@@ -5,7 +5,7 @@
 namespace NetCommon
 {
     template<typename TMessageId>
-    class ServerBase
+    class ServerServiceBase
     {
     protected:
         using ClientPointer         = typename TcpConnection<TMessageId>::Pointer;
@@ -18,13 +18,13 @@ namespace NetCommon
         using Strand                = boost::asio::strand<boost::asio::io_context::executor_type>;
 
     public:
-        ServerBase(uint16_t port)
+        ServerServiceBase(uint16_t port)
             : _acceptor(_ioContext, Tcp::endpoint(Tcp::v4(), port))
             , _clientsStrand(boost::asio::make_strand(_ioContext))
             , _receiveBufferStrand(boost::asio::make_strand(_ioContext))
         {}
 
-        virtual ~ServerBase()
+        virtual ~ServerServiceBase()
         {
             Stop();
         }
