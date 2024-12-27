@@ -1,38 +1,15 @@
 ﻿#include <Client/Pch.hpp>
-#include <NetCommon/Message.hpp>
-#include <NetCommon/ClientBase.hpp>
-
-enum class MessageId : uint32_t
-{
-    MovePlayer,
-    AttackMonster,
-    FireBullet,
-};
-
-class Client : public NetCommon::ClientBase<MessageId>
-{
-public:
-    bool FireBullet(float x, float y)
-    {
-        NetCommon::Message<MessageId> message;
-        message.header.id = MessageId::FireBullet;
-
-        message << x << y;
-        Send(message);
-
-        return true;
-    }
-};
+#include <Client/Service.hpp>
 
 int main() 
 {
     try
     {
-        Client client;
+        Client::Service service;
+        service.Connect("127.0.0.1", "60000");
 
-        client.Connect("127.0.0.1", "3000");
-        client.FireBullet(2.3f, 5.2f);
-
+        while (true)
+        {}
     }
     catch (const std::exception& e)
     {

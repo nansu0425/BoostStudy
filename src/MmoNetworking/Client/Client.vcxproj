@@ -28,7 +28,9 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="MessageId.hpp" />
     <ClInclude Include="Pch.hpp" />
+    <ClInclude Include="Service.hpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>
