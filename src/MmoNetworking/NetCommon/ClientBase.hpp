@@ -8,12 +8,13 @@ namespace NetCommon
     class ClientBase
     {
     private:
-        using ConnectionPointer     = typename TcpConnection<TMessageId>::Pointer;
+        using ServerPointer         = typename TcpConnection<TMessageId>::Pointer;
         using Tcp                   = boost::asio::ip::tcp;
         using OwnedMessage          = OwnedMessage<TMessageId>;
         using Message               = Message<TMessageId>;
         using Owner                 = typename TcpConnection<TMessageId>::Owner;
         using Strand                = boost::asio::strand<boost::asio::io_context::executor_type>;
+        using Endpoints             = boost::asio::ip::basic_resolver_results<Tcp>;
 
     public:
         ClientBase()
@@ -32,18 +33,23 @@ namespace NetCommon
         }
 
     public:
-        void Connect(std::string_view host, 
-                     std::string_view service)
+        void Connect(std::string_view host, std::string_view service)
         {
             try
             {
+                Tcp::resolver resolver(_ioContext);
+                Endpoints endpoints = resolver.resolve(host, service);
+
                 _pServer = TcpConnection<TMessageId>::Create(Owner::Client,
                                                              _ioContext,
                                                              _receiveBuffer,
                                                              _receiveBufferStrand);
+                _pServer->ConnectToServer(endpoints);
 
-                Tcp::resolver resolver(_ioContext);
-                _pServer->OnServerConnected();
+                _worker = std::thread([this]()
+                                      {
+                                          _ioContext.run();
+                                      });
             }
             catch (const std::exception&)
             {
@@ -54,7 +60,7 @@ namespace NetCommon
 
         void Disconnect()
         {
-            _pServer->Disconnect();
+            _pServer->Close();
         }
 
         bool IsConnected()
@@ -71,7 +77,13 @@ namespace NetCommon
 
         void Send(const Message& message)
         {
+            if (!IsConnected())
+            {
+                _pServer->Close();
+                return;
+            }
 
+            _pServer->SendAsync(message);
         }
 
         std::queue<OwnedMessage>& ReceiveBuffer()
@@ -82,7 +94,7 @@ namespace NetCommon
     protected:
         boost::asio::io_context     _ioContext;
         std::thread                 _worker;
-        ConnectionPointer           _pServer;
+        ServerPointer               _pServer;
 
     private:
         std::queue<OwnedMessage>    _receiveBuffer;

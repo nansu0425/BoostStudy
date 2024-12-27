@@ -10,16 +10,17 @@ namespace NetCommon
         : public std::enable_shared_from_this<TcpConnection<TMessageId>>
     {
     private:
-        using Tcp           = boost::asio::ip::tcp;
-        using Strand        = boost::asio::strand<boost::asio::io_context::executor_type>;
-        using Message       = Message<TMessageId>;
-        using MessageHeader = MessageHeader<TMessageId>;
-        using OwnedMessage  = OwnedMessage<TMessageId>;
-        using ErrorCode     = boost::system::error_code;
+        using Tcp               = boost::asio::ip::tcp;
+        using Strand            = boost::asio::strand<boost::asio::io_context::executor_type>;
+        using Message           = Message<TMessageId>;
+        using MessageHeader     = MessageHeader<TMessageId>;
+        using OwnedMessage      = OwnedMessage<TMessageId>;
+        using ErrorCode         = boost::system::error_code;
+        using Endpoints         = boost::asio::ip::basic_resolver_results<Tcp>;
 
     public:
-        using Pointer       = std::shared_ptr<TcpConnection>;
-        using Id            = uint32_t;
+        using Pointer           = std::shared_ptr<TcpConnection>;
+        using Id                = uint32_t;
 
         enum class Owner
         {
@@ -44,9 +45,12 @@ namespace NetCommon
             return !error;
         }
 
-        void OnServerConnected()
+        void ConnectToServer(const Endpoints& endpoints)
         {
             assert(_owner == Owner::Client);
+
+            boost::asio::connect(_socket, endpoints);
+            ReadHeaderAsync();
         }
 
         void OnClientApproved(Id clientId)
@@ -58,12 +62,9 @@ namespace NetCommon
             ReadHeaderAsync();
         }
 
-        void Disconnect()
+        void Close()
         {
-            if (IsConnected())
-            {
-                _socket.close();
-            }
+            _socket.close();
         }
 
         void SendAsync(const Message& message)
