@@ -8,7 +8,7 @@ int main()
 
     while (true)
     {
-        server.Update();
+        server.UpdateAsync();
     }
 
     return 0;

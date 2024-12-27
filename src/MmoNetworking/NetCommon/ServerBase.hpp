@@ -14,11 +14,13 @@ namespace NetCommon
         using Message               = Message<TMessageId>;
         using ClientId              = typename TcpConnection<TMessageId>::Id;
         using ClientMap             = std::unordered_map<ClientId, ClientPointer>;
-        using OwnerType             = typename TcpConnection<TMessageId>::OwnerType;
+        using Owner                 = typename TcpConnection<TMessageId>::Owner;
+        using Strand                = boost::asio::strand<boost::asio::io_context::executor_type>;
 
     public:
         ServerBase(uint16_t port)
             : _acceptor(_ioContext, Tcp::endpoint(Tcp::v4(), port))
+            , _receiveBufferStrand(boost::asio::make_strand(_ioContext))
         {}
 
         virtual ~ServerBase()
@@ -30,7 +32,7 @@ namespace NetCommon
         {
             try
             {
-                StartAccept();
+                AcceptAsync();
 
                 _worker = std::thread([this]()
                                       {
@@ -62,7 +64,7 @@ namespace NetCommon
 
             if (pClient->IsConnected())
             {
-                pClient->Send(message);
+                pClient->SendAsync(message);
             }
             else
             {
@@ -82,7 +84,7 @@ namespace NetCommon
                 {
                     if (pClient != pIgnoredClient)
                     {
-                        pClient->Send(message);
+                        pClient->SendAsync(message);
                     }
 
                     ++iter;
@@ -95,20 +97,13 @@ namespace NetCommon
             }
         }
 
-        void Update(size_t nMaxMessages = -1)
+        void UpdateAsync(size_t nMaxMessages = -1)
         {
-            for (size_t messageCount = 0; messageCount < nMaxMessages; ++messageCount)
-            {
-                if (_receiveBuffer.empty())
-                {
-                    break;
-                }
-
-                OwnedMessage ownedMessage = _receiveBuffer.front();
-                _receiveBuffer.pop();
-
-                OnMessageReceived(ownedMessage.pOwner, ownedMessage.message);
-            }
+            boost::asio::post(_receiveBufferStrand,
+                              [this, nMaxMessages]()
+                              {
+                                  OnUpdateStarted(nMaxMessages);
+                              });
         }
 
     protected:
@@ -117,21 +112,22 @@ namespace NetCommon
         virtual void OnMessageReceived(ClientPointer pClient, Message& message) = 0;
 
     private:
-        void StartAccept()
+        void AcceptAsync()
         {
-            ClientPointer pClient = TcpConnection<TMessageId>::Create(OwnerType::Server,
+            ClientPointer pClient = TcpConnection<TMessageId>::Create(Owner::Server,
                                                                       _ioContext,
-                                                                      _receiveBuffer);
+                                                                      _receiveBuffer,
+                                                                      _receiveBufferStrand);
             assert(pClient != nullptr);
 
             _acceptor.async_accept(pClient->Socket(),
                                    [this, pClient](const boost::system::error_code& error)
                                    {
-                                       HandleAccept(pClient, error);
+                                       OnAcceptCompleted(pClient, error);
                                    });
         }
 
-        void HandleAccept(ClientPointer pClient, const boost::system::error_code& error)
+        void OnAcceptCompleted(ClientPointer pClient, const boost::system::error_code& error)
         {
             assert(pClient != nullptr);
 
@@ -141,15 +137,15 @@ namespace NetCommon
 
                 if (OnClientConnected(pClient))
                 {
-                    pClient->OnClientConnected(_nextClientId);
+                    pClient->OnClientApproved(_nextClientId);
                     _clients[_nextClientId] = std::move(pClient);
 
-                    std::cout << "[" << _nextClientId << "] Connection approved\n";
+                    std::cout << "[" << _nextClientId << "] Client approved\n";
                     ++_nextClientId;
                 }
                 else
                 {
-                    std::cout << "[-----] Connection denied\n";
+                    std::cout << "[-----] Client denied\n";
                 }
             }
             else
@@ -157,7 +153,51 @@ namespace NetCommon
                 std::cerr << "[SERVER] Failed to accept: " << error << "\n";
             }
 
-            StartAccept();
+            AcceptAsync();
+        }
+
+        void OnUpdateStarted(size_t nMaxMessages = -1)
+        {
+            if (nMaxMessages == -1)
+            {
+                _receivedMessages = std::move(_receiveBuffer);
+            }
+            else
+            {
+                for (size_t messageCount = 0; messageCount < nMaxMessages; ++messageCount)
+                {
+                    if (_receiveBuffer.empty())
+                    {
+                        break;
+                    }
+
+                    _receivedMessages.push(std::move(_receiveBuffer.front()));
+                    _receiveBuffer.pop();
+                }
+            }
+
+            ProcessReceivedMessagesAsync();
+        }
+
+        void ProcessReceivedMessagesAsync()
+        {
+            boost::asio::post([this]()
+                              {
+                                  OnProcessReceivedMessagesStarted();
+                              });
+        }
+
+        void OnProcessReceivedMessagesStarted()
+        {
+            while (!_receivedMessages.empty())
+            {
+                OwnedMessage receiveMessage = std::move(_receivedMessages.front());
+                _receivedMessages.pop();
+
+                OnMessageReceived(receiveMessage.pOwner, receiveMessage.message);
+            }
+
+            UpdateAsync();
         }
 
     protected:
@@ -169,6 +209,7 @@ namespace NetCommon
 
     private:
         std::queue<OwnedMessage>        _receiveBuffer;
-
+        Strand                          _receiveBufferStrand;
+        std::queue<OwnedMessage>        _receivedMessages;
     };
 }

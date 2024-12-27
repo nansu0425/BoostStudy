@@ -21,18 +21,19 @@ namespace NetCommon
         using Pointer       = std::shared_ptr<TcpConnection>;
         using Id            = uint32_t;
 
-        enum class OwnerType
+        enum class Owner
         {
             Server,
             Client,
         };
 
     public:
-        static Pointer Create(OwnerType ownerType,
+        static Pointer Create(Owner owner,
                               boost::asio::io_context& ioContext,
-                              std::queue<OwnedMessage>& messagesReceived)
+                              std::queue<OwnedMessage>& receiveBuffer,
+                              Strand& receiveBufferStrand)
         {
-            return Pointer(new TcpConnection(ownerType, ioContext, messagesReceived));
+            return Pointer(new TcpConnection(owner, ioContext, receiveBuffer, receiveBufferStrand));
         }
 
         bool IsConnected() const
@@ -43,36 +44,33 @@ namespace NetCommon
             return !error;
         }
 
-        // Called when the client successfully connects to the server
         void OnServerConnected()
         {
-            assert(_ownerType == OwnerType::Client);
+            assert(_owner == Owner::Client);
         }
 
-        // Called when a new client connection is accepted on the server
-        void OnClientConnected(Id clientId)
+        void OnClientApproved(Id clientId)
         {
-            assert(_ownerType == OwnerType::Server);
+            assert(_owner == Owner::Server);
             assert(IsConnected());
 
             SetId(clientId);
-            StartReadHeader();
+            ReadHeaderAsync();
         }
 
         void Disconnect()
-        {
-        }
+        {}
 
-        void Send(const Message& writeMessage)
+        void SendAsync(const Message& message)
         {
-            boost::asio::post(_strand,
-                              [wpSelf = this->weak_from_this(), writeMessage]()
+            boost::asio::post(_sendBufferStrand,
+                              [wpSelf = this->weak_from_this(), message]()
                               {
                                   auto spSelf = wpSelf.lock();
 
                                   if (spSelf != nullptr)
                                   {
-                                      spSelf->HandleSend(writeMessage);
+                                      spSelf->OnSendStarted(message);
                                   }
                               });
         }
@@ -93,34 +91,36 @@ namespace NetCommon
         }
 
     private:
-        TcpConnection(OwnerType ownerType, 
+        TcpConnection(Owner owner, 
                       boost::asio::io_context& ioContext,
-                      std::queue<OwnedMessage>& receiveBuffer)
-            : _ownerType(ownerType)
-            , _strand(boost::asio::make_strand(ioContext))
+                      std::queue<OwnedMessage>& receiveBuffer,
+                      Strand& receiveBufferStrand)
+            : _owner(owner)
+            , _ioContext(ioContext)
             , _socket(ioContext)
+            , _sendBufferStrand(boost::asio::make_strand(ioContext))
             , _receiveBuffer(receiveBuffer)
+            , _receiveBufferStrand(receiveBufferStrand)
         {}
 
-        void StartReadHeader()
+        void ReadHeaderAsync()
         {
             boost::asio::async_read(_socket,
                                     boost::asio::buffer(&_readMessage.header,
                                                         sizeof(MessageHeader)),
-                                    boost::asio::bind_executor(_strand,
-                                                               [wpSelf = this->weak_from_this()](const ErrorCode& error,
-                                                                                                 const size_t nBytesTransferred)
-                                                               {
-                                                                   auto spSelf = wpSelf.lock();
+                                    [wpSelf = this->weak_from_this()](const ErrorCode& error,
+                                                                      const size_t nBytesTransferred)
+                                    {
+                                        auto spSelf = wpSelf.lock();
 
-                                                                   if (spSelf != nullptr)
-                                                                   {
-                                                                       spSelf->HandleReadHeader(error, nBytesTransferred);
-                                                                   }
-                                                               }));
+                                        if (spSelf != nullptr)
+                                        {
+                                            spSelf->OnReadHeaderCompleted(error, nBytesTransferred);
+                                        }
+                                    });
         }
 
-        void HandleReadHeader(const ErrorCode& error, const size_t nBytesTransferred)
+        void OnReadHeaderCompleted(const ErrorCode& error, const size_t nBytesTransferred)
         {
             if (!error)
             {
@@ -131,11 +131,11 @@ namespace NetCommon
                 if (_readMessage.header.size > sizeof(MessageHeader))
                 {
                     _readMessage.payload.resize(_readMessage.header.size - sizeof(MessageHeader));
-                    StartReadPayload();
+                    ReadPayloadAsync();
                 }
                 else
                 {
-                    AddReadMessageToReceiveBuffer();
+                    PushToReceiveBufferAsync();
                 }
             }
             else
@@ -145,31 +145,30 @@ namespace NetCommon
             }
         }
 
-        void StartReadPayload()
+        void ReadPayloadAsync()
         {
             boost::asio::async_read(_socket,
                                     boost::asio::buffer(_readMessage.payload.data(),
                                                         _readMessage.payload.size()),
-                                    boost::asio::bind_executor(_strand,
-                                                               [wpSelf = this->weak_from_this()](const ErrorCode& error,
-                                                                                                 const size_t nBytesTransferred)
-                                                               {
-                                                                   auto spSelf = wpSelf.lock();
+                                    [wpSelf = this->weak_from_this()](const ErrorCode& error,
+                                                                      const size_t nBytesTransferred)
+                                    {
+                                        auto spSelf = wpSelf.lock();
 
-                                                                   if (spSelf != nullptr)
-                                                                   {
-                                                                       spSelf->HandleReadPayload(error, nBytesTransferred);
-                                                                   }
-                                                               }));
+                                        if (spSelf != nullptr)
+                                        {
+                                            spSelf->OnReadPayloadCompleted(error, nBytesTransferred);
+                                        }
+                                    });
         }
 
-        void HandleReadPayload(const ErrorCode& error, const size_t nBytesTransferred)
+        void OnReadPayloadCompleted(const ErrorCode& error, const size_t nBytesTransferred)
         {
             if (!error)
             {
                 assert(_readMessage.payload.size() == nBytesTransferred);
 
-                AddReadMessageToReceiveBuffer();
+                PushToReceiveBufferAsync();
             }
             else
             {
@@ -178,24 +177,57 @@ namespace NetCommon
             }
         }
 
-        void HandleSend(const Message& writeMessage)
+        void PushToReceiveBufferAsync()
+        {
+            boost::asio::post(_receiveBufferStrand,
+                              [wpSelf = this->weak_from_this()]()
+                              {
+                                  auto spSelf = wpSelf.lock();
+
+                                  if (spSelf != nullptr)
+                                  {
+                                      spSelf->OnPushToReceiveBufferStarted();
+                                  }
+                              });
+        }
+
+        void OnPushToReceiveBufferStarted()
+        {
+            switch (_owner)
+            {
+            case Owner::Server:
+                _receiveBuffer.push(OwnedMessage{this->shared_from_this(), _readMessage});
+                break;
+
+            case Owner::Client:
+                _receiveBuffer.push(OwnedMessage{nullptr, _readMessage});
+                break;
+
+            default:
+                assert(true);
+            }
+
+            ReadHeaderAsync();
+        }
+
+        void OnSendStarted(const Message& message)
         {
             bool isWritingMessage = !_sendBuffer.empty();
 
-            _sendBuffer.push(writeMessage);
+            _sendBuffer.push(message);
 
             if (!isWritingMessage)
             {
-                StartWriteHeader();
+                WriteHeaderAsync();
             }
         }
 
-        void StartWriteHeader()
+        void WriteHeaderAsync()
         {
             boost::asio::async_write(_socket,
                                      boost::asio::buffer(&_sendBuffer.front().header, 
                                                          sizeof(MessageHeader)),
-                                     boost::asio::bind_executor(_strand,
+                                     boost::asio::bind_executor(_sendBufferStrand,
                                                                 [wpSelf = this->weak_from_this()](const ErrorCode& error,
                                                                                                   const size_t nBytesTransferred)
                                                                 {
@@ -203,12 +235,12 @@ namespace NetCommon
 
                                                                     if (spSelf != nullptr)
                                                                     {
-                                                                        spSelf->HandleWriteHeader(error, nBytesTransferred);
+                                                                        spSelf->OnWriteHeaderCompleted(error, nBytesTransferred);
                                                                     }
                                                                 }));
         }
 
-        void HandleWriteHeader(const ErrorCode& error, const size_t nBytesTransferred)
+        void OnWriteHeaderCompleted(const ErrorCode& error, const size_t nBytesTransferred)
         {
             if (!error)
             {
@@ -217,11 +249,11 @@ namespace NetCommon
                 // The size of payload is bigger than 0
                 if (_sendBuffer.front().header.size > sizeof(MessageHeader))
                 {
-                    StartWritePayload();
+                    WritePayloadAsync();
                 }
                 else
                 {
-                    RemoveWriteMessageFromSendBuffer();
+                    PopFromSendBufferAsync();
                 }
             }
             else
@@ -231,12 +263,12 @@ namespace NetCommon
             }
         }
 
-        void StartWritePayload()
+        void WritePayloadAsync()
         {
             boost::asio::async_write(_socket,
                                      boost::asio::buffer(_sendBuffer.front().payload.data(),
                                                          _sendBuffer.front().payload.size()),
-                                     boost::asio::bind_executor(_strand,
+                                     boost::asio::bind_executor(_sendBufferStrand,
                                                                 [wpSelf = this->weak_from_this()](const ErrorCode& error,
                                                                                                   const size_t nBytesTransferred)
                                                                 {
@@ -244,18 +276,18 @@ namespace NetCommon
 
                                                                     if (spSelf != nullptr)
                                                                     {
-                                                                        HandleWritePayload(error, nBytesTransferred);
+                                                                        spSelf->OnWritePayloadCompleted(error, nBytesTransferred);
                                                                     }
                                                                 }));
         }
 
-        void HandleWritePayload(const ErrorCode& error, const size_t nBytesTransferred)
+        void OnWritePayloadCompleted(const ErrorCode& error, const size_t nBytesTransferred)
         {
             if (!error)
             {
                 assert(nBytesTransferred == _sendBuffer.front().payload.size());
 
-                RemoveWriteMessageFromSendBuffer();
+                PopFromSendBufferAsync();
             }
             else
             {
@@ -264,42 +296,39 @@ namespace NetCommon
             }
         }
 
-        void AddReadMessageToReceiveBuffer()
+        void PopFromSendBufferAsync()
         {
-            switch (_ownerType)
-            {
-            case OwnerType::Server:
-                _receiveBuffer.push(OwnedMessage{this->shared_from_this(), _readMessage});
-                break;
+            boost::asio::post(_sendBufferStrand,
+                              [wpSelf = this->weak_from_this()]()
+                              {
+                                  auto spSelf = wpSelf.lock();
 
-            case OwnerType::Client:
-                _receiveBuffer.push(OwnedMessage{nullptr, _readMessage});
-                break;
-
-            default:
-                assert(true);
-            }
-
-            StartReadHeader();
+                                  if (spSelf != nullptr)
+                                  {
+                                      spSelf->OnPopFromSendBufferStarted();
+                                  }
+                              });
         }
 
-        void RemoveWriteMessageFromSendBuffer()
+        void OnPopFromSendBufferStarted()
         {
             _sendBuffer.pop();
 
             if (!_sendBuffer.empty())
             {
-                StartWriteHeader();
+                WriteHeaderAsync();
             }
         }
 
     protected:
         Id                              _id = -1;
-        OwnerType                       _ownerType;
-        Strand                          _strand;
+        Owner                           _owner;
+        boost::asio::io_context&        _ioContext;
         Tcp::socket                     _socket;
         std::queue<Message>             _sendBuffer;
+        Strand                          _sendBufferStrand;
         std::queue<OwnedMessage>&       _receiveBuffer;
+        Strand&                         _receiveBufferStrand;
 
     private:
         Message                         _readMessage;

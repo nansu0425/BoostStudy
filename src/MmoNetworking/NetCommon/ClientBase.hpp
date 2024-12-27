@@ -12,7 +12,8 @@ namespace NetCommon
         using Tcp                   = boost::asio::ip::tcp;
         using OwnedMessage          = OwnedMessage<TMessageId>;
         using Message               = Message<TMessageId>;
-        using OwnerType             = typename TcpConnection<TMessageId>::OwnerType;
+        using Owner                 = typename TcpConnection<TMessageId>::Owner;
+        using Strand                = boost::asio::strand<boost::asio::io_context::executor_type>;
 
     public:
         ClientBase() = default;
@@ -34,9 +35,10 @@ namespace NetCommon
         {
             try
             {
-                _pServer = TcpConnection<TMessageId>::Create(OwnerType::Client,
+                _pServer = TcpConnection<TMessageId>::Create(Owner::Client,
                                                              _ioContext,
-                                                             _receiveBuffer);
+                                                             _receiveBuffer,
+                                                             _receiveBufferStrand);
 
                 Tcp::resolver resolver(_ioContext);
                 _pServer->OnServerConnected();
@@ -85,5 +87,7 @@ namespace NetCommon
 
     private:
         std::queue<OwnedMessage>    _receiveBuffer;
+        Strand                      _receiveBufferStrand;
+
     };
 }

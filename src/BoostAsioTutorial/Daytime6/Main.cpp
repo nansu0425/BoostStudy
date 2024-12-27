@@ -52,7 +52,7 @@ private:
                                   [this, pMessage](const boost::system::error_code& error,
                                                    const size_t nBytesTransferred)
                                   {
-                                      HandleSend(pMessage, error, nBytesTransferred);
+                                      OnSendStarted(pMessage, error, nBytesTransferred);
                                   });
         }
 
@@ -60,7 +60,7 @@ private:
         StartReceive();
     }
 
-    void HandleSend(std::shared_ptr<std::string> pMessage,
+    void OnSendStarted(std::shared_ptr<std::string> pMessage,
                     const boost::system::error_code& error,
                     const size_t nBytesTransferred)
     {
