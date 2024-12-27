@@ -20,6 +20,7 @@ namespace NetCommon
     public:
         ServerBase(uint16_t port)
             : _acceptor(_ioContext, Tcp::endpoint(Tcp::v4(), port))
+            , _clientsStrand(boost::asio::make_strand(_ioContext))
             , _receiveBufferStrand(boost::asio::make_strand(_ioContext))
         {}
 
@@ -58,7 +59,45 @@ namespace NetCommon
             }
         }
 
-        void Send(ClientPointer pClient, const Message& message)
+        void SendAsync(ClientPointer pClient, const Message& message)
+        {
+            boost::asio::post(_clientsStrand,
+                              [this, pClient, &message]()
+                              {
+                                  OnSendStarted(pClient, message);
+                              });
+        }
+
+        void BroadcastAsync(const Message& message, ClientPointer pIgnoredClient = nullptr)
+        {
+            boost::asio::post(_clientsStrand,
+                              [this, &message, pIgnoredClient]()
+                              {
+                                  OnBroadcastStarted(message, pIgnoredClient);
+                              });
+        }
+
+        bool Update(size_t nMaxMessages = -1)
+        {
+            std::promise<bool> resultPromise;
+            std::future<bool> resultFuture = resultPromise.get_future();
+
+            boost::asio::post(_receiveBufferStrand,
+                              [this, nMaxMessages, &resultPromise]()
+                              {
+                                  OnUpdateStarted(resultPromise, nMaxMessages);
+                              });
+
+            return resultFuture.get();
+        }
+
+    protected:
+        virtual bool OnClientConnected(ClientPointer pClient) = 0;
+        virtual void OnClientDisconnected(ClientPointer pClient) = 0;
+        virtual void OnMessageReceived(ClientPointer pClient, Message& message) = 0;
+
+    private:
+        void OnSendStarted(ClientPointer pClient, const Message& message)
         {
             assert(pClient != nullptr);
 
@@ -73,7 +112,7 @@ namespace NetCommon
             }
         }
 
-        void Broadcast(const Message& message, ClientPointer pIgnoredClient = nullptr)
+        void OnBroadcastStarted(const Message& message, ClientPointer pIgnoredClient)
         {
             for (auto iter = _clients.begin(); iter != _clients.end();)
             {
@@ -97,26 +136,6 @@ namespace NetCommon
             }
         }
 
-        bool Update(size_t nMaxMessages = -1)
-        {
-            std::promise<bool> resultPromise;
-            std::future<bool> resultFuture = resultPromise.get_future();
-
-            boost::asio::post(_receiveBufferStrand,
-                              [this, nMaxMessages, &resultPromise]()
-                              {
-                                  OnUpdateStarted(resultPromise, nMaxMessages);
-                              });
-
-            return resultFuture.get();
-        }
-
-    protected:
-        virtual bool OnClientConnected(ClientPointer pClient) = 0;
-        virtual void OnClientDisconnected(ClientPointer pClient) = 0;
-        virtual void OnMessageReceived(ClientPointer pClient, Message& message) = 0;
-
-    private:
         void AcceptAsync()
         {
             ClientPointer pClient = TcpConnection<TMessageId>::Create(Owner::Server,
@@ -126,10 +145,11 @@ namespace NetCommon
             assert(pClient != nullptr);
 
             _acceptor.async_accept(pClient->Socket(),
-                                   [this, pClient](const boost::system::error_code& error)
-                                   {
-                                       OnAcceptCompleted(pClient, error);
-                                   });
+                                   boost::asio::bind_executor(_clientsStrand,
+                                                              [this, pClient](const boost::system::error_code& error)
+                                                              {
+                                                                  OnAcceptCompleted(pClient, error);
+                                                              }));
         }
 
         void OnAcceptCompleted(ClientPointer pClient, const boost::system::error_code& error)
@@ -211,6 +231,7 @@ namespace NetCommon
         Tcp::acceptor                   _acceptor;
         ClientId                        _nextClientId = 10000;
         ClientMap                       _clients;
+        Strand                          _clientsStrand;
 
     private:
         std::queue<OwnedMessage>        _receiveBuffer;
