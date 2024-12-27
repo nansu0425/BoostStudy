@@ -5,7 +5,7 @@
 namespace NetCommon
 {
     template<typename TMessageId>
-    class ClientBase
+    class ClientServiceBase
     {
     private:
         using ServerPointer         = typename TcpConnection<TMessageId>::Pointer;
@@ -17,11 +17,11 @@ namespace NetCommon
         using Endpoints             = boost::asio::ip::basic_resolver_results<Tcp>;
 
     public:
-        ClientBase()
+        ClientServiceBase()
             : _receiveBufferStrand(boost::asio::make_strand(_ioContext))
         {}
         
-        virtual ~ClientBase()
+        virtual ~ClientServiceBase()
         {
             Disconnect();
             _ioContext.stop();

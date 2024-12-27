@@ -1,10 +1,10 @@
 ﻿#pragma once
 
-#include <NetCommon/ClientBase.hpp>
+#include <NetCommon/ClientServiceBase.hpp>
 #include <Client/MessageId.hpp>
 
 namespace Client
 {
-    class Service : public NetCommon::ClientBase<MessageId>
+    class Service : public NetCommon::ClientServiceBase<MessageId>
     {};
 }
