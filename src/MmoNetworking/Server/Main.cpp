@@ -6,10 +6,8 @@ int main()
     Server server(60000);
     server.Start();
 
-    while (true)
-    {
-        server.UpdateAsync();
-    }
+    while (server.Update())
+    { }
 
     return 0;
 }

@@ -97,13 +97,18 @@ namespace NetCommon
             }
         }
 
-        void UpdateAsync(size_t nMaxMessages = -1)
+        bool Update(size_t nMaxMessages = -1)
         {
+            std::promise<bool> resultPromise;
+            std::future<bool> resultFuture = resultPromise.get_future();
+
             boost::asio::post(_receiveBufferStrand,
-                              [this, nMaxMessages]()
+                              [this, nMaxMessages, &resultPromise]()
                               {
-                                  OnUpdateStarted(nMaxMessages);
+                                  OnUpdateStarted(resultPromise, nMaxMessages);
                               });
+
+            return resultFuture.get();
         }
 
     protected:
@@ -156,7 +161,7 @@ namespace NetCommon
             AcceptAsync();
         }
 
-        void OnUpdateStarted(size_t nMaxMessages = -1)
+        void OnUpdateStarted(std::promise<bool>& updateResult, size_t nMaxMessages = -1)
         {
             if (nMaxMessages == -1)
             {
@@ -176,18 +181,18 @@ namespace NetCommon
                 }
             }
 
-            ProcessReceivedMessagesAsync();
+            ProcessReceivedMessagesAsync(updateResult);
         }
 
-        void ProcessReceivedMessagesAsync()
+        void ProcessReceivedMessagesAsync(std::promise<bool>& updateResult)
         {
-            boost::asio::post([this]()
+            boost::asio::post([this, &updateResult]()
                               {
-                                  OnProcessReceivedMessagesStarted();
+                                  OnProcessReceivedMessagesStarted(updateResult);
                               });
         }
 
-        void OnProcessReceivedMessagesStarted()
+        void OnProcessReceivedMessagesStarted(std::promise<bool>& updateResult)
         {
             while (!_receivedMessages.empty())
             {
@@ -197,7 +202,7 @@ namespace NetCommon
                 OnMessageReceived(receiveMessage.pOwner, receiveMessage.message);
             }
 
-            UpdateAsync();
+            updateResult.set_value(true);
         }
 
     protected:
@@ -211,5 +216,6 @@ namespace NetCommon
         std::queue<OwnedMessage>        _receiveBuffer;
         Strand                          _receiveBufferStrand;
         std::queue<OwnedMessage>        _receivedMessages;
+        
     };
 }
