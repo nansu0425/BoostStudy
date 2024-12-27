@@ -59,7 +59,12 @@ namespace NetCommon
         }
 
         void Disconnect()
-        {}
+        {
+            if (IsConnected())
+            {
+                _socket.close();
+            }
+        }
 
         void SendAsync(const Message& message)
         {

@@ -16,7 +16,9 @@ namespace NetCommon
         using Strand                = boost::asio::strand<boost::asio::io_context::executor_type>;
 
     public:
-        ClientBase() = default;
+        ClientBase()
+            : _receiveBufferStrand(boost::asio::make_strand(_ioContext))
+        {}
         
         virtual ~ClientBase()
         {
@@ -52,10 +54,7 @@ namespace NetCommon
 
         void Disconnect()
         {
-            if (IsConnected())
-            {
-                _pServer->Disconnect();
-            }
+            _pServer->Disconnect();
         }
 
         bool IsConnected()
