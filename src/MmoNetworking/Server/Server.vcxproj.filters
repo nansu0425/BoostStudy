@@ -6,7 +6,8 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Pch.hpp" />
-    <ClInclude Include="Service.hpp" />
+    <ClInclude Include="ServerServiceBase.hpp" />
     <ClInclude Include="MessageId.hpp" />
+    <ClInclude Include="Service.hpp" />
   </ItemGroup>
 </Project>

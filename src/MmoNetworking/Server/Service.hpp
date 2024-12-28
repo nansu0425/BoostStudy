@@ -1,27 +1,31 @@
 ﻿#pragma once
 
-#include <NetCommon/ServerServiceBase.hpp>
-#include <Server/MessageId.hpp>
+#include <Server/ServerServiceBase.hpp>
 
 namespace Server
 {
-    class Service : public NetCommon::ServerServiceBase<MessageId>
+    class Service : public ServerServiceBase
     {
     public:
         Service(uint16_t port)
-            : NetCommon::ServerServiceBase<MessageId>(port)
+            : ServerServiceBase(port)
         {}
 
     protected:
-        virtual bool OnClientConnected(ClientPointer pClient) override
+        virtual bool OnSessionConnected(SessionPointer pSession) override
         {
             return true;
         }
 
-        virtual void OnClientDisconnected(ClientPointer pClient) override
+        virtual void OnSessionDisconnected(SessionPointer pSession) override
         {}
 
-        virtual void OnMessageReceived(ClientPointer pClient, Message& message) override
+        virtual void OnMessageReceived(SessionPointer pSession, Message& message) override
         {}
+
+        virtual bool OnUpdateStarted() override
+        {
+            return true;
+        }
     };
 }
