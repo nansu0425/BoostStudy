@@ -5,16 +5,12 @@
 
 namespace NetCommon
 {
-    template<typename TMessageId>
     class Session 
-        : public std::enable_shared_from_this<Session<TMessageId>>
+        : public std::enable_shared_from_this<Session>
     {
     private:
         using Tcp               = boost::asio::ip::tcp;
         using Strand            = boost::asio::strand<boost::asio::io_context::executor_type>;
-        using Message           = Message<TMessageId>;
-        using MessageHeader     = MessageHeader<TMessageId>;
-        using OwnedMessage      = OwnedMessage<TMessageId>;
         using ErrorCode         = boost::system::error_code;
         using Endpoints         = boost::asio::ip::basic_resolver_results<Tcp>;
 
@@ -70,7 +66,7 @@ namespace NetCommon
         void SendAsync(const Message& message)
         {
             boost::asio::post(_sendBufferStrand,
-                              [wpSelf = this->weak_from_this(), message]()
+                              [wpSelf = weak_from_this(), message]()
                               {
                                   auto spSelf = wpSelf.lock();
 
@@ -114,8 +110,8 @@ namespace NetCommon
             boost::asio::async_read(_socket,
                                     boost::asio::buffer(&_readMessage.header,
                                                         sizeof(MessageHeader)),
-                                    [wpSelf = this->weak_from_this()](const ErrorCode& error,
-                                                                      const size_t nBytesTransferred)
+                                    [wpSelf = weak_from_this()](const ErrorCode& error,
+                                                                const size_t nBytesTransferred)
                                     {
                                         auto spSelf = wpSelf.lock();
 
@@ -156,8 +152,8 @@ namespace NetCommon
             boost::asio::async_read(_socket,
                                     boost::asio::buffer(_readMessage.payload.data(),
                                                         _readMessage.payload.size()),
-                                    [wpSelf = this->weak_from_this()](const ErrorCode& error,
-                                                                      const size_t nBytesTransferred)
+                                    [wpSelf = weak_from_this()](const ErrorCode& error,
+                                                                const size_t nBytesTransferred)
                                     {
                                         auto spSelf = wpSelf.lock();
 
@@ -186,7 +182,7 @@ namespace NetCommon
         void PushToReceiveBufferAsync()
         {
             boost::asio::post(_receiveBufferStrand,
-                              [wpSelf = this->weak_from_this()]()
+                              [wpSelf = weak_from_this()]()
                               {
                                   auto spSelf = wpSelf.lock();
 
@@ -202,7 +198,7 @@ namespace NetCommon
             switch (_owner)
             {
             case Owner::Server:
-                _receiveBuffer.push(OwnedMessage{this->shared_from_this(), _readMessage});
+                _receiveBuffer.push(OwnedMessage{shared_from_this(), _readMessage});
                 break;
 
             case Owner::Client:
@@ -234,8 +230,8 @@ namespace NetCommon
                                      boost::asio::buffer(&_sendBuffer.front().header, 
                                                          sizeof(MessageHeader)),
                                      boost::asio::bind_executor(_sendBufferStrand,
-                                                                [wpSelf = this->weak_from_this()](const ErrorCode& error,
-                                                                                                  const size_t nBytesTransferred)
+                                                                [wpSelf = weak_from_this()](const ErrorCode& error,
+                                                                                            const size_t nBytesTransferred)
                                                                 {
                                                                     auto spSelf = wpSelf.lock();
 
@@ -275,8 +271,8 @@ namespace NetCommon
                                      boost::asio::buffer(_sendBuffer.front().payload.data(),
                                                          _sendBuffer.front().payload.size()),
                                      boost::asio::bind_executor(_sendBufferStrand,
-                                                                [wpSelf = this->weak_from_this()](const ErrorCode& error,
-                                                                                                  const size_t nBytesTransferred)
+                                                                [wpSelf = weak_from_this()](const ErrorCode& error,
+                                                                                            const size_t nBytesTransferred)
                                                                 {
                                                                     auto spSelf = wpSelf.lock();
 
@@ -305,7 +301,7 @@ namespace NetCommon
         void PopFromSendBufferAsync()
         {
             boost::asio::post(_sendBufferStrand,
-                              [wpSelf = this->weak_from_this()]()
+                              [wpSelf = weak_from_this()]()
                               {
                                   auto spSelf = wpSelf.lock();
 

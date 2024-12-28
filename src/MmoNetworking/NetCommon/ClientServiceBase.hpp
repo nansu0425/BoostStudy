@@ -4,15 +4,12 @@
 
 namespace NetCommon
 {
-    template<typename TMessageId>
     class ClientServiceBase
     {
     protected:
-        using ServerPointer         = typename Session<TMessageId>::Pointer;
+        using SessionPointer        = Session::Pointer;
         using Tcp                   = boost::asio::ip::tcp;
-        using OwnedMessage          = OwnedMessage<TMessageId>;
-        using Message               = Message<TMessageId>;
-        using Owner                 = typename Session<TMessageId>::Owner;
+        using Owner                 = Session::Owner;
         using Strand                = boost::asio::strand<boost::asio::io_context::executor_type>;
         using Endpoints             = boost::asio::ip::basic_resolver_results<Tcp>;
 
@@ -40,10 +37,10 @@ namespace NetCommon
                 Tcp::resolver resolver(_ioContext);
                 Endpoints endpoints = resolver.resolve(host, service);
 
-                _pServer = Session<TMessageId>::Create(Owner::Client,
-                                                       _ioContext,
-                                                       _receiveBuffer,
-                                                       _receiveBufferStrand);
+                _pServer = Session::Create(Owner::Client,
+                                           _ioContext,
+                                           _receiveBuffer,
+                                           _receiveBufferStrand);
                 _pServer->ConnectToServer(endpoints);
 
                 _worker = std::thread([this]()
@@ -89,7 +86,7 @@ namespace NetCommon
     protected:
         boost::asio::io_context     _ioContext;
         std::thread                 _worker;
-        ServerPointer               _pServer;
+        SessionPointer              _pServer;
 
     private:
         std::queue<OwnedMessage>    _receiveBuffer;

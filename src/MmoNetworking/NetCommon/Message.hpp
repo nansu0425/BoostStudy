@@ -6,32 +6,30 @@ namespace NetCommon
 {
     using MessageId = uint32_t;
 
-    template<typename TMessageId>
     struct MessageHeader
     {
-        TMessageId id = TMessageId();
+        MessageId id = 0;
         uint32_t size = sizeof(MessageHeader);
 
-        friend std::ostream& operator<<(std::ostream& os, const MessageHeader<TMessageId>& header)
+        friend std::ostream& operator<<(std::ostream& os, const MessageHeader& header)
         {
-            os << "[id = " << static_cast<MessageId>(header.id) << " | size = " << header.size << "]";
+            os << "[id = " << header.id << " | size = " << header.size << "]";
 
             return os;
         }
     };
 
-    template<typename TMessageId>
     struct Message
     {
-        MessageHeader<TMessageId> header;
+        MessageHeader header;
         std::vector<std::byte> payload;
 
         size_t CalculateSize() const
         {
-            return sizeof(MessageHeader<TMessageId>) + payload.size();
+            return sizeof(MessageHeader) + payload.size();
         }
 
-        friend std::ostream& operator<<(std::ostream& os, const Message<TMessageId>& message)
+        friend std::ostream& operator<<(std::ostream& os, const Message& message)
         {
             os << "Header:\n" << message.header << std::endl;
             
@@ -43,7 +41,7 @@ namespace NetCommon
  
         // Push data to playload of message
         template<typename TData>
-        friend Message<TMessageId>& operator<<(Message<TMessageId>& message, const TData& data)
+        friend Message& operator<<(Message& message, const TData& data)
         {
             static_assert(std::is_standard_layout<TData>::value, "Tdata must be standard-layout type");
 
@@ -59,7 +57,7 @@ namespace NetCommon
 
         // Pop data from playload of message
         template<typename TData>
-        friend Message<TMessageId>& operator>>(Message<TMessageId>& message, TData& data)
+        friend Message& operator>>(Message& message, TData& data)
         {
             static_assert(std::is_standard_layout<TData>::value, "Tdata must be standard-layout type");
 
@@ -74,16 +72,12 @@ namespace NetCommon
         }
     };
 
-    template<typename TMessageId>
-    class Session;
-
-    template<typename TMessageId>
     struct OwnedMessage
     {
-        std::shared_ptr<Session<TMessageId>> pOwner = nullptr;
-        Message<TMessageId> message;
+        std::shared_ptr<class Session> pOwner = nullptr;
+        Message message;
 
-        friend std::ostream& operator<<(std::ostream& os, const OwnedMessage<TMessageId>& ownedMessage)
+        friend std::ostream& operator<<(std::ostream& os, const OwnedMessage& ownedMessage)
         {
             os << ownedMessage.message;
 

@@ -23,6 +23,7 @@
     <ClInclude Include="Message.hpp" />
     <ClInclude Include="Include.hpp" />
     <ClInclude Include="Pch.hpp" />
+    <ClInclude Include="ServerServiceBase.hpp" />
     <ClInclude Include="ServiceBase.hpp" />
     <ClInclude Include="Session.hpp" />
   </ItemGroup>

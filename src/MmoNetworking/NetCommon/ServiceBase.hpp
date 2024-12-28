@@ -4,16 +4,12 @@
 
 namespace NetCommon
 {
-    template<typename TMessageId>
     class ServiceBase
     {
     protected:
-        using SessionPointer        = typename Session<TMessageId>::Pointer;
-        using OwnedMessage          = OwnedMessage<TMessageId>;
-        using Message               = Message<TMessageId>;
-        using SessionId             = typename Session<TMessageId>::Id;
+        using SessionPointer        = Session::Pointer;
+        using SessionId             = Session::Id;
         using SessionMap            = std::unordered_map<SessionId, SessionPointer>;
-        using Owner                 = typename Session<TMessageId>::Owner;
         using Strand                = boost::asio::strand<boost::asio::io_context::executor_type>;
         using WorkGuard             = boost::asio::executor_work_guard< boost::asio::io_context::executor_type>;
 
@@ -100,16 +96,16 @@ namespace NetCommon
             }
         }
 
-        void OnBroadcastStarted(const Message& message, SessionPointer pIgnoredClient)
+        void OnBroadcastStarted(const Message& message, SessionPointer pIgnoredSession)
         {
             for (auto iter = _sessions.begin(); iter != _sessions.end();)
             {
-                SessionPointer pSession = *iter.second;
+                SessionPointer pSession = iter->second;
                 assert(pSession != nullptr);
 
                 if (pSession->IsConnected())
                 {
-                    if (pSession != pIgnoredClient)
+                    if (pSession != pIgnoredSession)
                     {
                         pSession->SendAsync(message);
                     }

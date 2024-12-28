@@ -7,6 +7,7 @@
     <ClInclude Include="Session.hpp" />
     <ClInclude Include="ClientServiceBase.hpp" />
     <ClInclude Include="ServiceBase.hpp" />
+    <ClInclude Include="ServerServiceBase.hpp" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Pch.cpp" />
