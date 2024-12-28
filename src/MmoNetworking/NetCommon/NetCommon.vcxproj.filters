@@ -4,7 +4,7 @@
     <ClInclude Include="Include.hpp" />
     <ClInclude Include="Message.hpp" />
     <ClInclude Include="Pch.hpp" />
-    <ClInclude Include="TcpConnection.hpp" />
+    <ClInclude Include="Session.hpp" />
     <ClInclude Include="ClientServiceBase.hpp" />
     <ClInclude Include="ServerServiceBase.hpp" />
   </ItemGroup>

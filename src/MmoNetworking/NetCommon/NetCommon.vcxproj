@@ -24,7 +24,7 @@
     <ClInclude Include="Include.hpp" />
     <ClInclude Include="Pch.hpp" />
     <ClInclude Include="ServerServiceBase.hpp" />
-    <ClInclude Include="TcpConnection.hpp" />
+    <ClInclude Include="Session.hpp" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Pch.cpp">

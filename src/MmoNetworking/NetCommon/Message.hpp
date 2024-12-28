@@ -75,12 +75,12 @@ namespace NetCommon
     };
 
     template<typename TMessageId>
-    class TcpConnection;
+    class Session;
 
     template<typename TMessageId>
     struct OwnedMessage
     {
-        std::shared_ptr<TcpConnection<TMessageId>> pOwner = nullptr;
+        std::shared_ptr<Session<TMessageId>> pOwner = nullptr;
         Message<TMessageId> message;
 
         friend std::ostream& operator<<(std::ostream& os, const OwnedMessage<TMessageId>& ownedMessage)

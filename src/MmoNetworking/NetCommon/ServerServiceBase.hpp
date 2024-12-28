@@ -1,6 +1,6 @@
 ﻿#pragma once
 
-#include <NetCommon/TcpConnection.hpp>
+#include <NetCommon/Session.hpp>
 
 namespace NetCommon
 {
@@ -8,13 +8,13 @@ namespace NetCommon
     class ServerServiceBase
     {
     protected:
-        using ClientPointer         = typename TcpConnection<TMessageId>::Pointer;
+        using ClientPointer         = typename Session<TMessageId>::Pointer;
         using Tcp                   = boost::asio::ip::tcp;
         using OwnedMessage          = OwnedMessage<TMessageId>;
         using Message               = Message<TMessageId>;
-        using ClientId              = typename TcpConnection<TMessageId>::Id;
+        using ClientId              = typename Session<TMessageId>::Id;
         using ClientMap             = std::unordered_map<ClientId, ClientPointer>;
-        using Owner                 = typename TcpConnection<TMessageId>::Owner;
+        using Owner                 = typename Session<TMessageId>::Owner;
         using Strand                = boost::asio::strand<boost::asio::io_context::executor_type>;
 
     public:
@@ -138,10 +138,10 @@ namespace NetCommon
 
         void AcceptAsync()
         {
-            ClientPointer pClient = TcpConnection<TMessageId>::Create(Owner::Server,
-                                                                      _ioContext,
-                                                                      _receiveBuffer,
-                                                                      _receiveBufferStrand);
+            ClientPointer pClient = Session<TMessageId>::Create(Owner::Server,
+                                                                _ioContext,
+                                                                _receiveBuffer,
+                                                                _receiveBufferStrand);
             assert(pClient != nullptr);
 
             _acceptor.async_accept(pClient->Socket(),

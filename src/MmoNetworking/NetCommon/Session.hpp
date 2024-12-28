@@ -6,8 +6,8 @@
 namespace NetCommon
 {
     template<typename TMessageId>
-    class TcpConnection 
-        : public std::enable_shared_from_this<TcpConnection<TMessageId>>
+    class Session 
+        : public std::enable_shared_from_this<Session<TMessageId>>
     {
     private:
         using Tcp               = boost::asio::ip::tcp;
@@ -19,7 +19,7 @@ namespace NetCommon
         using Endpoints         = boost::asio::ip::basic_resolver_results<Tcp>;
 
     public:
-        using Pointer           = std::shared_ptr<TcpConnection>;
+        using Pointer           = std::shared_ptr<Session>;
         using Id                = uint32_t;
 
         enum class Owner
@@ -34,7 +34,7 @@ namespace NetCommon
                               std::queue<OwnedMessage>& receiveBuffer,
                               Strand& receiveBufferStrand)
         {
-            return Pointer(new TcpConnection(owner, ioContext, receiveBuffer, receiveBufferStrand));
+            return Pointer(new Session(owner, ioContext, receiveBuffer, receiveBufferStrand));
         }
 
         bool IsConnected() const
@@ -97,10 +97,10 @@ namespace NetCommon
         }
 
     private:
-        TcpConnection(Owner owner, 
-                      boost::asio::io_context& ioContext,
-                      std::queue<OwnedMessage>& receiveBuffer,
-                      Strand& receiveBufferStrand)
+        Session(Owner owner, 
+                boost::asio::io_context& ioContext,
+                std::queue<OwnedMessage>& receiveBuffer,
+                Strand& receiveBufferStrand)
             : _owner(owner)
             , _ioContext(ioContext)
             , _socket(ioContext)
