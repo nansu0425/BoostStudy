@@ -6,10 +6,6 @@ namespace Client
 {
     enum class MessageId : NetCommon::MessageId
     {
-        Accept = 1000,
-        Deny,
-        Ping,
-        Send,
-        Broadcast,
+        Ping = 1000,
     };
 }
