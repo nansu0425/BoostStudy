@@ -7,7 +7,7 @@ namespace NetCommon
     template<typename TMessageId>
     class ClientServiceBase
     {
-    private:
+    protected:
         using ServerPointer         = typename TcpConnection<TMessageId>::Pointer;
         using Tcp                   = boost::asio::ip::tcp;
         using OwnedMessage          = OwnedMessage<TMessageId>;
@@ -84,11 +84,6 @@ namespace NetCommon
             }
 
             _pServer->SendAsync(message);
-        }
-
-        std::queue<OwnedMessage>& ReceiveBuffer()
-        {
-            return _receiveBuffer;
         }
 
     protected:
