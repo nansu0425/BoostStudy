@@ -1,32 +1,26 @@
 ﻿#pragma once
 
-#include <NetCommon/Session.hpp>
+#include <NetCommon/ServiceBase.hpp>
 
 namespace NetCommon
 {
-    class ClientServiceBase
+    class ClientServiceBase : public ServiceBase
     {
     protected:
-        using SessionPointer        = Session::Pointer;
         using Tcp                   = boost::asio::ip::tcp;
         using Owner                 = Session::Owner;
-        using Strand                = boost::asio::strand<boost::asio::io_context::executor_type>;
         using Endpoints             = boost::asio::ip::basic_resolver_results<Tcp>;
 
     public:
         ClientServiceBase()
-            : _receiveBufferStrand(boost::asio::make_strand(_ioContext))
-        {}
+            : ServiceBase()
+        {
+            RunWorker();
+        }
         
         virtual ~ClientServiceBase()
         {
             Disconnect();
-            _ioContext.stop();
-
-            if (_worker.joinable())
-            {
-                _worker.join();
-            }
         }
 
     public:
@@ -37,16 +31,13 @@ namespace NetCommon
                 Tcp::resolver resolver(_ioContext);
                 Endpoints endpoints = resolver.resolve(host, service);
 
-                _pServer = Session::Create(Owner::Client,
-                                           _ioContext,
-                                           _receiveBuffer,
-                                           _receiveBufferStrand);
-                _pServer->ConnectToServer(endpoints);
+                _pSession = Session::Create(Owner::Client,
+                                            _ioContext,
+                                            _receiveBuffer,
+                                            _receiveBufferStrand);
+                _pSession->Connect(endpoints);
 
-                _worker = std::thread([this]()
-                                      {
-                                          _ioContext.run();
-                                      });
+                OnSessionConnected();
             }
             catch (const std::exception&)
             {
@@ -57,40 +48,32 @@ namespace NetCommon
 
         void Disconnect()
         {
-            _pServer->Close();
+            _pSession->Disconnect();
+            OnSessionDisconnected(_pSession);
         }
 
-        bool IsConnected()
+        bool IsConnected() const
         {
-            if (_pServer != nullptr)
-            {
-                return _pServer->IsConnected();
-            }
-            else
-            {
-                return false;
-            }
+            return (_pSession) 
+                   ? _pSession->IsConnected() 
+                   : false;
         }
 
-        void Send(const Message& message)
+        void SendAsync(const Message& message)
         {
             if (!IsConnected())
             {
-                _pServer->Close();
                 return;
             }
 
-            _pServer->SendAsync(message);
+            _pSession->SendAsync(message);
         }
 
     protected:
-        boost::asio::io_context     _ioContext;
-        std::thread                 _worker;
-        SessionPointer              _pServer;
+        virtual void OnSessionConnected() = 0;
 
-    private:
-        std::queue<OwnedMessage>    _receiveBuffer;
-        Strand                      _receiveBufferStrand;
+    protected:
+        SessionPointer      _pSession;
 
     };
 }

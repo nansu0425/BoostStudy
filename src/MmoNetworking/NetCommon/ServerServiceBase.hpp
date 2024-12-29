@@ -62,7 +62,7 @@ namespace NetCommon
 
                 if (OnSessionConnected(pSession))
                 {
-                    pSession->OnClientApproved(_nextSessionId);
+                    pSession->OnSessionApproved(_nextSessionId);
                     _sessions[_nextSessionId] = std::move(pSession);
 
                     std::cout << "[" << _nextSessionId << "] Client approved\n";

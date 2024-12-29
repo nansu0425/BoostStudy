@@ -8,7 +8,7 @@ int main()
         Client::Service service;
         service.Connect("127.0.0.1", "60000");
 
-        while (true)
+        while (service.Update())
         {}
     }
     catch (const std::exception& e)

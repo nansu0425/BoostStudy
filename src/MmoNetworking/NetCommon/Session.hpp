@@ -41,24 +41,22 @@ namespace NetCommon
             return !error;
         }
 
-        void ConnectToServer(const Endpoints& endpoints)
+        void Connect(const Endpoints& endpoints)
         {
             assert(_owner == Owner::Client);
 
             boost::asio::connect(_socket, endpoints);
-            ReadHeaderAsync();
         }
 
-        void OnClientApproved(Id clientId)
+        void OnSessionApproved(Id id)
         {
-            assert(_owner == Owner::Server);
             assert(IsConnected());
 
-            SetId(clientId);
+            SetId(id);
             ReadHeaderAsync();
         }
 
-        void Close()
+        void Disconnect()
         {
             _socket.close();
         }
