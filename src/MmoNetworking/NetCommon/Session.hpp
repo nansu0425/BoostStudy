@@ -21,11 +21,13 @@ namespace NetCommon
     public:
         static Pointer Create(Id id,
                               boost::asio::io_context& ioContext,
+                              Tcp::socket&& socket,
                               std::queue<OwnedMessage>& receiveBuffer,
                               Strand& receiveBufferStrand)
         {
             return Pointer(new Session(id, 
                                        ioContext, 
+                                       std::move(socket),
                                        receiveBuffer, 
                                        receiveBufferStrand));
         }
@@ -64,24 +66,26 @@ namespace NetCommon
                               });
         }
 
-        Tcp::socket& Socket()
-        {
-            return _socket;
-        }
-
         Id GetId() const
         {
             return _id;
         }
 
+        Tcp::endpoint GetEndpoint() const
+        {
+            return _socket.remote_endpoint();
+        }
+
+
     private:
         Session(Id id,
                 boost::asio::io_context& ioContext,
+                Tcp::socket&& socket,
                 std::queue<OwnedMessage>& receiveBuffer,
                 Strand& receiveBufferStrand)
             : _id(id)
             , _ioContext(ioContext)
-            , _socket(ioContext)
+            , _socket(std::move(socket))
             , _sendBufferStrand(boost::asio::make_strand(ioContext))
             , _receiveBuffer(receiveBuffer)
             , _receiveBufferStrand(receiveBufferStrand)

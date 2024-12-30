@@ -12,6 +12,8 @@ namespace NetCommon
         using SessionMap            = std::unordered_map<SessionId, SessionPointer>;
         using Strand                = boost::asio::strand<boost::asio::io_context::executor_type>;
         using WorkGuard             = boost::asio::executor_work_guard< boost::asio::io_context::executor_type>;
+        using ErrorCode             = boost::system::error_code;
+        using Tcp                   = boost::asio::ip::tcp;
 
     public:
         ServiceBase()

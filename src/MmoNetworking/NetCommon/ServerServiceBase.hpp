@@ -6,10 +6,6 @@ namespace NetCommon
 {
     class ServerServiceBase : public ServiceBase
     {
-    protected:
-        using Tcp       = boost::asio::ip::tcp;
-        using Acceptor  = Tcp::acceptor;
-
     public:
         ServerServiceBase(uint16_t port)
             : ServiceBase()
@@ -24,7 +20,7 @@ namespace NetCommon
             }
             catch (const std::exception&)
             {
-                std::cerr << "[SERVER] Failed to start: ";
+                std::cerr << "[SERVER] Failed to start\n";
                 throw;
             }
 
@@ -34,27 +30,25 @@ namespace NetCommon
     private:
         void AcceptAsync()
         {
-            SessionPointer pSession = Session::Create(AssignId(),
-                                                      _ioContext,
-                                                      _receiveBuffer,
-                                                      _receiveBufferStrand);
-            assert(pSession != nullptr);
-
-            _acceptor.async_accept(pSession->Socket(),
-                                   boost::asio::bind_executor(_sessionsStrand,
-                                                              [this, pSession](const boost::system::error_code& error)
+            _acceptor.async_accept(boost::asio::bind_executor(_sessionsStrand,
+                                                              [this](const ErrorCode& error,
+                                                                     Tcp::socket socket)
                                                               {
-                                                                  OnAcceptCompleted(pSession, error);
+                                                                  OnAcceptCompleted(error, std::move(socket));
                                                               }));
         }
 
-        void OnAcceptCompleted(SessionPointer pSession, const boost::system::error_code& error)
+        void OnAcceptCompleted(const ErrorCode& error, Tcp::socket&& socket)
         {
-            assert(pSession != nullptr);
-
             if (!error)
             {
-                std::cout << "[SERVER] New session: " << pSession->Socket().remote_endpoint() << "\n";
+                SessionPointer pSession = Session::Create(AssignId(),
+                                                          _ioContext,
+                                                          std::move(socket),
+                                                          _receiveBuffer,
+                                                          _receiveBufferStrand);
+
+                std::cout << "[SERVER] New session: " << pSession->GetEndpoint() << "\n";
 
                 if (OnSessionConnected(pSession))
                 {
@@ -75,7 +69,7 @@ namespace NetCommon
         }
 
     protected:
-        Acceptor       _acceptor;
+        Tcp::acceptor       _acceptor;
 
     };
 }

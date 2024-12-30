@@ -7,7 +7,6 @@ namespace NetCommon
     class ClientServiceBase : public ServiceBase
     {
     protected:
-        using Tcp                   = boost::asio::ip::tcp;
         using Endpoints             = boost::asio::ip::basic_resolver_results<Tcp>;
 
     public:
@@ -36,11 +35,12 @@ namespace NetCommon
             {
                 SessionPointer pSession = Session::Create(AssignId(),
                                                           _ioContext,
+                                                          Tcp::socket(_ioContext),
                                                           _receiveBuffer,
                                                           _receiveBufferStrand);
                 pSession->Connect(endpoints);
 
-                std::cout << "[CLIENT] New session: " << pSession->Socket().remote_endpoint() << "\n";
+                std::cout << "[CLIENT] New session: " << pSession->GetEndpoint() << "\n";
 
                 if (OnSessionConnected(pSession))
                 {
