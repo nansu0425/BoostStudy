@@ -20,7 +20,6 @@ namespace NetCommon
             try
             {
                 AcceptAsync();
-                RunWorker();
             }
             catch (const std::exception&)
             {

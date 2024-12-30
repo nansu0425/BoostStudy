@@ -13,9 +13,7 @@ namespace NetCommon
     public:
         ClientServiceBase()
             : ServiceBase()
-        {
-            RunWorker();
-        }
+        {}
         
         virtual ~ClientServiceBase()
         {

@@ -18,7 +18,9 @@ namespace NetCommon
             : _workGuard(boost::asio::make_work_guard(_ioContext))
             , _sessionsStrand(boost::asio::make_strand(_ioContext))
             , _receiveBufferStrand(boost::asio::make_strand(_ioContext))
-        {}
+        {
+            RunWorker();
+        }
 
         virtual ~ServiceBase()
         {
