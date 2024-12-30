@@ -52,8 +52,7 @@ namespace NetCommon
 
         void SendAsync(SessionPointer pSession, const Message& message)
         {
-            boost::asio::post(_sessionsStrand,
-                              [this, pSession, &message]()
+            boost::asio::post([this, pSession, &message]()
                               {
                                   OnSendStarted(pSession, message);
                               });
@@ -71,9 +70,9 @@ namespace NetCommon
         void Disconnect(SessionPointer pSession)
         {
             pSession->Disconnect();
-            _sessions.erase(pSession->GetId());
-
             OnSessionDisconnected(pSession);
+
+            EraseSessionAsync(pSession);
         }
 
         void DisconnectAll()
@@ -85,6 +84,8 @@ namespace NetCommon
                 pSession->Disconnect();
                 OnSessionDisconnected(pSession);
             }
+
+            ClearSessionsAsync();
         }
 
         bool IsConnected(SessionPointer pSession) const
@@ -103,10 +104,13 @@ namespace NetCommon
             return assignedId;
         }
 
-        void RegisterSession(SessionPointer pSession)
+        void RegisterSessionAsync(SessionPointer pSession)
         {
-            _sessions[pSession->GetId()] = pSession;
-            pSession->ReadAsync();
+            boost::asio::post(_sessionsStrand, 
+                              [this, pSession]()
+                              {
+                                  OnRegisterSessionStarted(pSession);
+                              });
         }
 
     private:
@@ -128,6 +132,49 @@ namespace NetCommon
             }
         }
 
+        void EraseSessionAsync(SessionPointer pSession)
+        {
+            boost::asio::post(_sessionsStrand,
+                              [this, pSession]()
+                              {
+                                  OnEraseSessionStarted(pSession);
+                              });
+        }
+
+        void OnEraseSessionStarted(SessionPointer pSession)
+        {
+            _sessions.erase(pSession->GetId());
+        }
+
+        void ClearSessionsAsync()
+        {
+            boost::asio::post(_sessionsStrand,
+                              [this]()
+                              {
+                                  OnClearSessionsStarted();
+                              });
+        }
+
+        void OnRegisterSessionStarted(SessionPointer pSession)
+        {
+            _sessions[pSession->GetId()] = pSession;
+
+            OnRegisterSessionCompleted(pSession);
+        }
+
+        void OnRegisterSessionCompleted(SessionPointer pSession)
+        {
+            assert(_sessions.count(pSession->GetId()) == 1);
+
+            pSession->ReadAsync();
+            std::cout << "[" << pSession->GetId() << "] Session registered\n";
+        }
+
+        void OnClearSessionsStarted()
+        {
+            _sessions.clear();
+        }
+
         void OnSendStarted(SessionPointer pSession, const Message& message)
         {
             assert(pSession != nullptr);
@@ -139,7 +186,7 @@ namespace NetCommon
             else
             {
                 OnSessionDisconnected(pSession);
-                _sessions.erase(pSession->GetId());
+                EraseSessionAsync(pSession);
             }
         }
 
@@ -162,7 +209,7 @@ namespace NetCommon
                 else
                 {
                     OnSessionDisconnected(pSession);
-                    iter = _sessions.erase(iter);
+                    EraseSessionAsync(pSession);
                 }
             }
         }

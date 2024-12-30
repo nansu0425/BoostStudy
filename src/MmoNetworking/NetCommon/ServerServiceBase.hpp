@@ -52,8 +52,7 @@ namespace NetCommon
 
                 if (OnSessionConnected(pSession))
                 {
-                    RegisterSession(pSession);
-                    std::cout << "[" << pSession->GetId() << "] Session registered\n";
+                    RegisterSessionAsync(pSession);
                 }
                 else
                 {

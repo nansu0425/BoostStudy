@@ -3,12 +3,18 @@
 
 int main()
 {
-    Server::Service service(60000);
+    try
+    {
+        Server::Service service(60000);
+        service.Start();
 
-    service.Start();
-
-    while (service.Update())
-    { }
+        while (service.Update())
+        {}
+    }
+    catch (const std::exception& e)
+    {
+        std::cerr << e.what() << std::endl;
+    }
 
     return 0;
 }
