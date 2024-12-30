@@ -55,14 +55,9 @@ namespace NetCommon
         void SendAsync(const Message& message)
         {
             boost::asio::post(_sendBufferStrand,
-                              [wpSelf = weak_from_this(), message]()
+                              [self = shared_from_this(), message]()
                               {
-                                  auto spSelf = wpSelf.lock();
-
-                                  if (spSelf != nullptr)
-                                  {
-                                      spSelf->OnSendStarted(message);
-                                  }
+                                  self->OnSendStarted(message);
                               });
         }
 
@@ -97,15 +92,10 @@ namespace NetCommon
             boost::asio::async_read(_socket,
                                     boost::asio::buffer(&_readMessage.header,
                                                         sizeof(MessageHeader)),
-                                    [wpSelf = weak_from_this()](const ErrorCode& error,
-                                                                const size_t nBytesTransferred)
+                                    [pSelf = shared_from_this()](const ErrorCode& error,
+                                                                 const size_t nBytesTransferred)
                                     {
-                                        auto spSelf = wpSelf.lock();
-
-                                        if (spSelf != nullptr)
-                                        {
-                                            spSelf->OnReadHeaderCompleted(error, nBytesTransferred);
-                                        }
+                                        pSelf->OnReadHeaderCompleted(error, nBytesTransferred);
                                     });
         }
 
@@ -139,15 +129,10 @@ namespace NetCommon
             boost::asio::async_read(_socket,
                                     boost::asio::buffer(_readMessage.payload.data(),
                                                         _readMessage.payload.size()),
-                                    [wpSelf = weak_from_this()](const ErrorCode& error,
-                                                                const size_t nBytesTransferred)
+                                    [pSelf = shared_from_this()](const ErrorCode& error,
+                                                                 const size_t nBytesTransferred)
                                     {
-                                        auto spSelf = wpSelf.lock();
-
-                                        if (spSelf != nullptr)
-                                        {
-                                            spSelf->OnReadPayloadCompleted(error, nBytesTransferred);
-                                        }
+                                        pSelf->OnReadPayloadCompleted(error, nBytesTransferred);
                                     });
         }
 
@@ -169,14 +154,9 @@ namespace NetCommon
         void PushToReceiveBufferAsync()
         {
             boost::asio::post(_receiveBufferStrand,
-                              [wpSelf = weak_from_this()]()
+                              [pSelf = shared_from_this()]()
                               {
-                                  auto spSelf = wpSelf.lock();
-
-                                  if (spSelf != nullptr)
-                                  {
-                                      spSelf->OnPushToReceiveBufferStarted();
-                                  }
+                                  pSelf->OnPushToReceiveBufferStarted();
                               });
         }
 
@@ -205,15 +185,10 @@ namespace NetCommon
                                      boost::asio::buffer(&_sendBuffer.front().header, 
                                                          sizeof(MessageHeader)),
                                      boost::asio::bind_executor(_sendBufferStrand,
-                                                                [wpSelf = weak_from_this()](const ErrorCode& error,
-                                                                                            const size_t nBytesTransferred)
+                                                                [pSelf = shared_from_this()](const ErrorCode& error,
+                                                                                             const size_t nBytesTransferred)
                                                                 {
-                                                                    auto spSelf = wpSelf.lock();
-
-                                                                    if (spSelf != nullptr)
-                                                                    {
-                                                                        spSelf->OnWriteHeaderCompleted(error, nBytesTransferred);
-                                                                    }
+                                                                    pSelf->OnWriteHeaderCompleted(error, nBytesTransferred);
                                                                 }));
         }
 
@@ -246,15 +221,10 @@ namespace NetCommon
                                      boost::asio::buffer(_sendBuffer.front().payload.data(),
                                                          _sendBuffer.front().payload.size()),
                                      boost::asio::bind_executor(_sendBufferStrand,
-                                                                [wpSelf = weak_from_this()](const ErrorCode& error,
-                                                                                            const size_t nBytesTransferred)
+                                                                [pSelf = shared_from_this()](const ErrorCode& error,
+                                                                                             const size_t nBytesTransferred)
                                                                 {
-                                                                    auto spSelf = wpSelf.lock();
-
-                                                                    if (spSelf != nullptr)
-                                                                    {
-                                                                        spSelf->OnWritePayloadCompleted(error, nBytesTransferred);
-                                                                    }
+                                                                    pSelf->OnWritePayloadCompleted(error, nBytesTransferred);
                                                                 }));
         }
 
@@ -276,14 +246,9 @@ namespace NetCommon
         void PopFromSendBufferAsync()
         {
             boost::asio::post(_sendBufferStrand,
-                              [wpSelf = weak_from_this()]()
+                              [pSelf = shared_from_this()]()
                               {
-                                  auto spSelf = wpSelf.lock();
-
-                                  if (spSelf != nullptr)
-                                  {
-                                      spSelf->OnPopFromSendBufferStarted();
-                                  }
+                                  pSelf->OnPopFromSendBufferStarted();
                               });
         }
 
