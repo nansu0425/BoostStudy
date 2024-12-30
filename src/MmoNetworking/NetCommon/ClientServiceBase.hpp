@@ -11,29 +11,46 @@ namespace NetCommon
         using Endpoints             = boost::asio::ip::basic_resolver_results<Tcp>;
 
     public:
-        ClientServiceBase()
-            : ServiceBase()
-        {}
-        
-        virtual ~ClientServiceBase()
-        {
-            Disconnect();
-        }
-
-    public:
-        void Connect(std::string_view host, std::string_view service)
+        void Start(std::string_view host, std::string_view service)
         {
             try
             {
                 Tcp::resolver resolver(_ioContext);
                 Endpoints endpoints = resolver.resolve(host, service);
 
-                _pSession = Session::Create(_ioContext,
-                                            _receiveBuffer,
-                                            _receiveBufferStrand);
-                _pSession->Connect(endpoints);
+                Connect(endpoints);
+            }
+            catch (const std::exception&)
+            {
+                std::cerr << "[CLIENT] Failed to start\n";
+                throw;
+            }
 
-                OnSessionConnected();
+            std::cout << "[CLIENT] Started!\n";
+        }
+
+    private:
+        void Connect(Endpoints endpoints)
+        {
+            try
+            {
+                SessionPointer pSession = Session::Create(AssignId(),
+                                                          _ioContext,
+                                                          _receiveBuffer,
+                                                          _receiveBufferStrand);
+                pSession->Connect(endpoints);
+
+                std::cout << "[CLIENT] New session: " << pSession->Socket().remote_endpoint() << "\n";
+
+                if (OnSessionConnected(pSession))
+                {
+                    RegisterSession(pSession);
+                    std::cout << "[" << pSession->GetId() << "] Session registered\n";
+                }
+                else
+                {
+                    std::cout << "[-----] Session denied\n";
+                }
             }
             catch (const std::exception&)
             {
@@ -41,35 +58,6 @@ namespace NetCommon
                 throw;
             }
         }
-
-        void Disconnect()
-        {
-            _pSession->Disconnect();
-            OnSessionDisconnected(_pSession);
-        }
-
-        bool IsConnected() const
-        {
-            return (_pSession) 
-                   ? _pSession->IsConnected() 
-                   : false;
-        }
-
-        void SendAsync(const Message& message)
-        {
-            if (!IsConnected())
-            {
-                return;
-            }
-
-            _pSession->SendAsync(message);
-        }
-
-    protected:
-        virtual void OnSessionConnected() = 0;
-
-    protected:
-        SessionPointer      _pSession;
 
     };
 }

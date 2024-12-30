@@ -8,6 +8,7 @@ namespace NetCommon
     {
     protected:
         using Tcp       = boost::asio::ip::tcp;
+        using Acceptor  = Tcp::acceptor;
 
     public:
         ServerServiceBase(uint16_t port)
@@ -30,13 +31,11 @@ namespace NetCommon
             std::cout << "[SERVER] Started!\n";
         }
 
-    protected:
-        virtual bool OnSessionConnected(SessionPointer pSession) = 0;
-
     private:
         void AcceptAsync()
         {
-            SessionPointer pSession = Session::Create(_ioContext,
+            SessionPointer pSession = Session::Create(AssignId(),
+                                                      _ioContext,
                                                       _receiveBuffer,
                                                       _receiveBufferStrand);
             assert(pSession != nullptr);
@@ -55,19 +54,16 @@ namespace NetCommon
 
             if (!error)
             {
-                std::cout << "[SERVER] New client: " << pSession->Socket().remote_endpoint() << "\n";
+                std::cout << "[SERVER] New session: " << pSession->Socket().remote_endpoint() << "\n";
 
                 if (OnSessionConnected(pSession))
                 {
-                    pSession->OnSessionApproved(_nextSessionId);
-                    _sessions[_nextSessionId] = std::move(pSession);
-
-                    std::cout << "[" << _nextSessionId << "] Client approved\n";
-                    ++_nextSessionId;
+                    RegisterSession(pSession);
+                    std::cout << "[" << pSession->GetId() << "] Session registered\n";
                 }
                 else
                 {
-                    std::cout << "[-----] Client denied\n";
+                    std::cout << "[-----] Session denied\n";
                 }
             }
             else
@@ -79,7 +75,7 @@ namespace NetCommon
         }
 
     protected:
-        Tcp::acceptor       _acceptor;
+        Acceptor       _acceptor;
 
     };
 }

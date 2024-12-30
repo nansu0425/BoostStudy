@@ -6,7 +6,7 @@ int main()
     try
     {
         Client::Service service;
-        service.Connect("127.0.0.1", "60000");
+        service.Start("127.0.0.1", "60000");
 
         while (service.Update())
         {}

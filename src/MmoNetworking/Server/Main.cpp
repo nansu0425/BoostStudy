@@ -4,6 +4,7 @@
 int main()
 {
     Server::Service service(60000);
+
     service.Start();
 
     while (service.Update())

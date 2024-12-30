@@ -11,8 +11,10 @@ namespace Client
         using Message       = NetCommon::Message;
 
     protected:
-        virtual void OnSessionConnected() override
-        {}
+        virtual bool OnSessionConnected(SessionPointer pSession) override
+        {
+            return true;
+        }
 
         virtual void OnSessionDisconnected(SessionPointer pSession) override
         {}
@@ -26,7 +28,7 @@ namespace Client
         }
 
     public:
-        void PingServer()
+        void Ping(SessionPointer pSession)
         {
             Message message;
             message.header.id = static_cast<NetCommon::MessageId>(MessageId::Ping);
@@ -34,7 +36,7 @@ namespace Client
             std::chrono::system_clock::time_point now = std::chrono::system_clock::now();
             message << now;
 
-            SendAsync(message);
+            SendAsync(pSession, message);
         }
     };
 }

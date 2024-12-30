@@ -19,11 +19,25 @@ namespace NetCommon
         using Id                = uint32_t;
 
     public:
-        static Pointer Create(boost::asio::io_context& ioContext,
+        static Pointer Create(Id id,
+                              boost::asio::io_context& ioContext,
                               std::queue<OwnedMessage>& receiveBuffer,
                               Strand& receiveBufferStrand)
         {
-            return Pointer(new Session(ioContext, receiveBuffer, receiveBufferStrand));
+            return Pointer(new Session(id, 
+                                       ioContext, 
+                                       receiveBuffer, 
+                                       receiveBufferStrand));
+        }
+
+        void Connect(const Endpoints& endpoints)
+        {
+            boost::asio::connect(_socket, endpoints);
+        }
+
+        void Disconnect()
+        {
+            _socket.close();
         }
 
         bool IsConnected() const
@@ -34,22 +48,11 @@ namespace NetCommon
             return !error;
         }
 
-        void Connect(const Endpoints& endpoints)
-        {
-            boost::asio::connect(_socket, endpoints);
-        }
-
-        void OnSessionApproved(Id id)
+        void ReadAsync()
         {
             assert(IsConnected());
 
-            SetId(id);
             ReadHeaderAsync();
-        }
-
-        void Disconnect()
-        {
-            _socket.close();
         }
 
         void SendAsync(const Message& message)
@@ -71,16 +74,13 @@ namespace NetCommon
             return _id;
         }
 
-        void SetId(Id id)
-        {
-            _id = id;
-        }
-
     private:
-        Session(boost::asio::io_context& ioContext,
+        Session(Id id,
+                boost::asio::io_context& ioContext,
                 std::queue<OwnedMessage>& receiveBuffer,
                 Strand& receiveBufferStrand)
-            : _ioContext(ioContext)
+            : _id(id)
+            , _ioContext(ioContext)
             , _socket(ioContext)
             , _sendBufferStrand(boost::asio::make_strand(ioContext))
             , _receiveBuffer(receiveBuffer)
@@ -268,7 +268,7 @@ namespace NetCommon
         }
 
     protected:
-        Id                              _id = -1;
+        const Id                        _id;
         boost::asio::io_context&        _ioContext;
         Tcp::socket                     _socket;
         std::queue<Message>             _sendBuffer;

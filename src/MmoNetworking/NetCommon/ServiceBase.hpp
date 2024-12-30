@@ -24,18 +24,29 @@ namespace NetCommon
 
         virtual ~ServiceBase()
         {
-            Stop();
+            DisconnectAll();
+            StopWorker();
         }
 
-        void Stop()
+        bool Update(size_t nMaxMessages = 0)
         {
-            _ioContext.stop();
+            std::promise<bool> resultPromise;
+            std::future<bool> resultFuture = resultPromise.get_future();
 
-            if (_worker.joinable())
-            {
-                _worker.join();
-            }
+            boost::asio::post(_receiveBufferStrand,
+                              [this, nMaxMessages, &resultPromise]()
+                              {
+                                  OnFetchReceivedMessagesStarted(resultPromise, nMaxMessages);
+                              });
+
+            return resultFuture.get();
         }
+
+    protected:
+        virtual bool OnSessionConnected(SessionPointer pSession) = 0;
+        virtual void OnSessionDisconnected(SessionPointer pSession) = 0;
+        virtual void OnMessageReceived(SessionPointer pSession, Message& message) = 0;
+        virtual bool OnUpdateStarted() = 0;
 
         void SendAsync(SessionPointer pSession, const Message& message)
         {
@@ -55,25 +66,48 @@ namespace NetCommon
                               });
         }
 
-        bool Update(size_t nMaxMessages = 0)
+        void Disconnect(SessionPointer pSession)
         {
-            std::promise<bool> resultPromise;
-            std::future<bool> resultFuture = resultPromise.get_future();
+            pSession->Disconnect();
+            _sessions.erase(pSession->GetId());
 
-            boost::asio::post(_receiveBufferStrand,
-                              [this, nMaxMessages, &resultPromise]()
-                              {
-                                  OnFetchReceivedMessagesStarted(resultPromise, nMaxMessages);
-                              });
-
-            return resultFuture.get();
+            OnSessionDisconnected(pSession);
         }
 
-    protected:
-        virtual void OnSessionDisconnected(SessionPointer pSession) = 0;
-        virtual void OnMessageReceived(SessionPointer pSession, Message& message) = 0;
-        virtual bool OnUpdateStarted() = 0;
+        void DisconnectAll()
+        {
+            for (auto& pair : _sessions)
+            {
+                SessionPointer pSession = pair.second;
 
+                pSession->Disconnect();
+                OnSessionDisconnected(pSession);
+            }
+        }
+
+        bool IsConnected(SessionPointer pSession) const
+        {
+            return (pSession)
+                   ? pSession->IsConnected()
+                   : false;
+        }
+
+        SessionId AssignId()
+        {
+            static SessionId id = 10000;
+            SessionId assignedId = id;
+            ++id;
+
+            return assignedId;
+        }
+
+        void RegisterSession(SessionPointer pSession)
+        {
+            _sessions[pSession->GetId()] = pSession;
+            pSession->ReadAsync();
+        }
+
+    private:
         void RunWorker()
         {
             _worker = std::thread([this]()
@@ -82,7 +116,16 @@ namespace NetCommon
                                   });
         }
 
-    private:
+        void StopWorker()
+        {
+            _ioContext.stop();
+
+            if (_worker.joinable())
+            {
+                _worker.join();
+            }
+        }
+
         void OnSendStarted(SessionPointer pSession, const Message& message)
         {
             assert(pSession != nullptr);
@@ -175,7 +218,6 @@ namespace NetCommon
         boost::asio::io_context         _ioContext;
         WorkGuard                       _workGuard;
         std::thread                     _worker;
-        SessionId                       _nextSessionId = 10000;
         SessionMap                      _sessions;
         Strand                          _sessionsStrand;
         std::queue<OwnedMessage>        _receiveBuffer;
