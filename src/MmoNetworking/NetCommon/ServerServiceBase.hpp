@@ -8,7 +8,6 @@ namespace NetCommon
     {
     protected:
         using Tcp       = boost::asio::ip::tcp;
-        using Owner     = Session::Owner;
 
     public:
         ServerServiceBase(uint16_t port)
@@ -38,8 +37,7 @@ namespace NetCommon
     private:
         void AcceptAsync()
         {
-            SessionPointer pSession = Session::Create(Owner::Server,
-                                                      _ioContext,
+            SessionPointer pSession = Session::Create(_ioContext,
                                                       _receiveBuffer,
                                                       _receiveBufferStrand);
             assert(pSession != nullptr);

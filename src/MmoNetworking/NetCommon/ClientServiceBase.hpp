@@ -8,7 +8,6 @@ namespace NetCommon
     {
     protected:
         using Tcp                   = boost::asio::ip::tcp;
-        using Owner                 = Session::Owner;
         using Endpoints             = boost::asio::ip::basic_resolver_results<Tcp>;
 
     public:
@@ -31,8 +30,7 @@ namespace NetCommon
                 Tcp::resolver resolver(_ioContext);
                 Endpoints endpoints = resolver.resolve(host, service);
 
-                _pSession = Session::Create(Owner::Client,
-                                            _ioContext,
+                _pSession = Session::Create(_ioContext,
                                             _receiveBuffer,
                                             _receiveBufferStrand);
                 _pSession->Connect(endpoints);

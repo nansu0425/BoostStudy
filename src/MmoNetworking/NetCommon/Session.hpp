@@ -18,19 +18,12 @@ namespace NetCommon
         using Pointer           = std::shared_ptr<Session>;
         using Id                = uint32_t;
 
-        enum class Owner
-        {
-            Server,
-            Client,
-        };
-
     public:
-        static Pointer Create(Owner owner,
-                              boost::asio::io_context& ioContext,
+        static Pointer Create(boost::asio::io_context& ioContext,
                               std::queue<OwnedMessage>& receiveBuffer,
                               Strand& receiveBufferStrand)
         {
-            return Pointer(new Session(owner, ioContext, receiveBuffer, receiveBufferStrand));
+            return Pointer(new Session(ioContext, receiveBuffer, receiveBufferStrand));
         }
 
         bool IsConnected() const
@@ -43,8 +36,6 @@ namespace NetCommon
 
         void Connect(const Endpoints& endpoints)
         {
-            assert(_owner == Owner::Client);
-
             boost::asio::connect(_socket, endpoints);
         }
 
@@ -91,12 +82,10 @@ namespace NetCommon
         }
 
     private:
-        Session(Owner owner, 
-                boost::asio::io_context& ioContext,
+        Session(boost::asio::io_context& ioContext,
                 std::queue<OwnedMessage>& receiveBuffer,
                 Strand& receiveBufferStrand)
-            : _owner(owner)
-            , _ioContext(ioContext)
+            : _ioContext(ioContext)
             , _socket(ioContext)
             , _sendBufferStrand(boost::asio::make_strand(ioContext))
             , _receiveBuffer(receiveBuffer)
@@ -193,19 +182,7 @@ namespace NetCommon
 
         void OnPushToReceiveBufferStarted()
         {
-            switch (_owner)
-            {
-            case Owner::Server:
-                _receiveBuffer.push(OwnedMessage{shared_from_this(), _readMessage});
-                break;
-
-            case Owner::Client:
-                _receiveBuffer.push(OwnedMessage{nullptr, _readMessage});
-                break;
-
-            default:
-                assert(true);
-            }
+            _receiveBuffer.push(OwnedMessage{shared_from_this(), _readMessage});
 
             ReadHeaderAsync();
         }
@@ -322,7 +299,6 @@ namespace NetCommon
 
     protected:
         Id                              _id = -1;
-        Owner                           _owner;
         boost::asio::io_context&        _ioContext;
         Tcp::socket                     _socket;
         std::queue<Message>             _sendBuffer;
