@@ -256,6 +256,11 @@ namespace NetCommon
         {
             _sendBuffer.pop();
 
+            OnPopFromSendBufferCompleted();
+        }
+
+        void OnPopFromSendBufferCompleted()
+        {
             if (!_sendBuffer.empty())
             {
                 WriteHeaderAsync();
