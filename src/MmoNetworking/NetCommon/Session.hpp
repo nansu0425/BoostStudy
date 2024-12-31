@@ -188,12 +188,11 @@ namespace NetCommon
             boost::asio::async_write(_socket,
                                      boost::asio::buffer(&_sendBuffer.front().header, 
                                                          sizeof(MessageHeader)),
-                                     boost::asio::bind_executor(_sendBufferStrand,
-                                                                [pSelf = shared_from_this()](const ErrorCode& error,
-                                                                                             const size_t nBytesTransferred)
-                                                                {
-                                                                    pSelf->OnWriteHeaderCompleted(error, nBytesTransferred);
-                                                                }));
+                                     [pSelf = shared_from_this()](const ErrorCode& error,
+                                                                  const size_t nBytesTransferred)
+                                     {
+                                         pSelf->OnWriteHeaderCompleted(error, nBytesTransferred);
+                                     });
         }
 
         void OnWriteHeaderCompleted(const ErrorCode& error, const size_t nBytesTransferred)
@@ -224,12 +223,11 @@ namespace NetCommon
             boost::asio::async_write(_socket,
                                      boost::asio::buffer(_sendBuffer.front().payload.data(),
                                                          _sendBuffer.front().payload.size()),
-                                     boost::asio::bind_executor(_sendBufferStrand,
-                                                                [pSelf = shared_from_this()](const ErrorCode& error,
-                                                                                             const size_t nBytesTransferred)
-                                                                {
-                                                                    pSelf->OnWritePayloadCompleted(error, nBytesTransferred);
-                                                                }));
+                                     [pSelf = shared_from_this()](const ErrorCode& error,
+                                                                  const size_t nBytesTransferred)
+                                     {
+                                         pSelf->OnWritePayloadCompleted(error, nBytesTransferred);
+                                     });
         }
 
         void OnWritePayloadCompleted(const ErrorCode& error, const size_t nBytesTransferred)
@@ -271,7 +269,7 @@ namespace NetCommon
             }
         }
 
-    protected:
+    private:
         const Id                        _id;
         boost::asio::io_context&        _ioContext;
         Tcp::socket                     _socket;
@@ -279,8 +277,6 @@ namespace NetCommon
         Strand                          _sendBufferStrand;
         std::queue<OwnedMessage>&       _receiveBuffer;
         Strand&                         _receiveBufferStrand;
-
-    private:
         Message                         _readMessage;
 
     };
