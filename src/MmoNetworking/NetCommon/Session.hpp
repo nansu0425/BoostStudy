@@ -124,7 +124,7 @@ namespace NetCommon
             else
             {
                 std::cerr << "[" << _id << "] Failed to read header: " << error << "\n";
-                _socket.close();
+                Disconnect();
             }
         }
 
@@ -151,7 +151,7 @@ namespace NetCommon
             else
             {
                 std::cerr << "[" << _id << "] Failed to read payload: " << error << "\n";
-                _socket.close();
+                Disconnect();
             }
         }
 
@@ -215,7 +215,7 @@ namespace NetCommon
             else
             {
                 std::cerr << "[" << _id << "] Failed to write header: " << error << "\n";
-                _socket.close();
+                Disconnect();
             }
         }
 
@@ -243,7 +243,7 @@ namespace NetCommon
             else
             {
                 std::cerr << "[" << _id << "] Failed to write payload: " << error << "\n";
-                _socket.close();
+                Disconnect();
             }
         }
 
