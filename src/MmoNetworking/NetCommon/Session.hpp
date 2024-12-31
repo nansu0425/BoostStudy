@@ -59,13 +59,12 @@ namespace NetCommon
             ReadHeaderAsync();
         }
 
-        void SendAsync(const Message& message)
+        void PushMessageToSendBuffer(const Message& message)
         {
-            boost::asio::post(_sendBufferStrand,
-                              [self = shared_from_this(), message]()
-                              {
-                                  self->OnSendStarted(message);
-                              });
+            auto writeLock = std::lock_guard(_writeLock);
+
+            _sendBuffer.push(message);
+            WriteMessageAsync();
         }
 
         Id GetId() const
@@ -106,9 +105,9 @@ namespace NetCommon
             : _id(id)
             , _ioContext(ioContext)
             , _socket(std::move(socket))
-            , _sendBufferStrand(boost::asio::make_strand(ioContext))
             , _receiveBuffer(receiveBuffer)
             , _receiveBufferStrand(receiveBufferStrand)
+            , _isWritingMessage(false)
         {}
 
         void ReadHeaderAsync()
@@ -191,22 +190,33 @@ namespace NetCommon
             ReadHeaderAsync();
         }
 
-        void OnSendStarted(const Message& message)
+        void WriteMessageAsync()
         {
-            bool isWritingMessage = !_sendBuffer.empty();
-
-            _sendBuffer.push(message);
-
-            if (!isWritingMessage)
+            if (_isWritingMessage || 
+                _sendBuffer.empty())
             {
-                WriteHeaderAsync();
+                return;
             }
+
+            _writeMessage = std::move(_sendBuffer.front());
+            _sendBuffer.pop();
+
+            WriteHeaderAsync();
+            _isWritingMessage = true;
+        }
+
+        void OnWriteMessageCompleted()
+        {
+            auto writeLock = std::lock_guard(_writeLock);
+
+            _isWritingMessage = false;
+            WriteMessageAsync();
         }
 
         void WriteHeaderAsync()
         {
             boost::asio::async_write(_socket,
-                                     boost::asio::buffer(&_sendBuffer.front().header, 
+                                     boost::asio::buffer(&_writeMessage.header, 
                                                          sizeof(MessageHeader)),
                                      [pSelf = shared_from_this()](const ErrorCode& error,
                                                                   const size_t nBytesTransferred)
@@ -222,13 +232,13 @@ namespace NetCommon
                 assert(sizeof(MessageHeader) == nBytesTransferred);
 
                 // The size of payload is bigger than 0
-                if (_sendBuffer.front().header.size > sizeof(MessageHeader))
+                if (_writeMessage.header.size > sizeof(MessageHeader))
                 {
                     WritePayloadAsync();
                 }
                 else
                 {
-                    PopFromSendBufferAsync();
+                    OnWriteMessageCompleted();
                 }
             }
             else
@@ -241,8 +251,8 @@ namespace NetCommon
         void WritePayloadAsync()
         {
             boost::asio::async_write(_socket,
-                                     boost::asio::buffer(_sendBuffer.front().payload.data(),
-                                                         _sendBuffer.front().payload.size()),
+                                     boost::asio::buffer(_writeMessage.payload.data(),
+                                                         _writeMessage.payload.size()),
                                      [pSelf = shared_from_this()](const ErrorCode& error,
                                                                   const size_t nBytesTransferred)
                                      {
@@ -254,38 +264,14 @@ namespace NetCommon
         {
             if (!error)
             {
-                assert(nBytesTransferred == _sendBuffer.front().payload.size());
+                assert(nBytesTransferred == _writeMessage.payload.size());
 
-                PopFromSendBufferAsync();
+                OnWriteMessageCompleted();
             }
             else
             {
                 std::cerr << "[" << _id << "] Failed to write payload: " << error << "\n";
                 Disconnect();
-            }
-        }
-
-        void PopFromSendBufferAsync()
-        {
-            boost::asio::post(_sendBufferStrand,
-                              [pSelf = shared_from_this()]()
-                              {
-                                  pSelf->OnPopFromSendBufferStarted();
-                              });
-        }
-
-        void OnPopFromSendBufferStarted()
-        {
-            _sendBuffer.pop();
-
-            OnPopFromSendBufferCompleted();
-        }
-
-        void OnPopFromSendBufferCompleted()
-        {
-            if (!_sendBuffer.empty())
-            {
-                WriteHeaderAsync();
             }
         }
 
@@ -295,9 +281,11 @@ namespace NetCommon
         Tcp::socket                     _socket;
         std::mutex                      _socketLock;
         std::queue<Message>             _sendBuffer;
-        Strand                          _sendBufferStrand;
+        std::mutex                      _writeLock;
         std::queue<OwnedMessage>&       _receiveBuffer;
         Strand&                         _receiveBufferStrand;
+        Message                         _writeMessage;
+        bool                            _isWritingMessage;
         Message                         _readMessage;
 
     };

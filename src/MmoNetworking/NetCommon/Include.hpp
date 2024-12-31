@@ -20,4 +20,3 @@
 #endif // _WIN32
 
 #include <boost/asio.hpp>
-#include <boost/lockfree/queue.hpp>
