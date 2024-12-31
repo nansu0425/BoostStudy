@@ -9,6 +9,7 @@ namespace NetCommon
         : public std::enable_shared_from_this<Session>
     {
     private:
+        using IoContext         = boost::asio::io_context;
         using Tcp               = boost::asio::ip::tcp;
         using Strand            = boost::asio::strand<boost::asio::io_context::executor_type>;
         using ErrorCode         = boost::system::error_code;
@@ -39,13 +40,14 @@ namespace NetCommon
 
         void Disconnect()
         {
+            std::lock_guard lockGuard(_socketLock);
             _socket.close();
         }
 
-        bool IsConnected() const
+        bool IsConnected()
         {
             ErrorCode error;
-            _socket.remote_endpoint(error);
+            GetEndpoint(error);
 
             return !error;
         }
@@ -71,11 +73,29 @@ namespace NetCommon
             return _id;
         }
 
-        Tcp::endpoint GetEndpoint() const
+        Tcp::endpoint GetEndpoint()
         {
-            return _socket.remote_endpoint();
+            Tcp::endpoint endpoint;
+
+            {
+                std::lock_guard lockGuard(_socketLock);
+                endpoint = _socket.remote_endpoint();
+            }
+
+            return endpoint;
         }
 
+        Tcp::endpoint GetEndpoint(ErrorCode& error)
+        {
+            Tcp::endpoint endpoint;
+
+            {
+                std::lock_guard lockGuard(_socketLock);
+                endpoint = _socket.remote_endpoint(error);
+            }
+
+            return endpoint;
+        }
 
     private:
         Session(Id id,
@@ -271,8 +291,9 @@ namespace NetCommon
 
     private:
         const Id                        _id;
-        boost::asio::io_context&        _ioContext;
+        IoContext&                      _ioContext;
         Tcp::socket                     _socket;
+        std::mutex                      _socketLock;
         std::queue<Message>             _sendBuffer;
         Strand                          _sendBufferStrand;
         std::queue<OwnedMessage>&       _receiveBuffer;
