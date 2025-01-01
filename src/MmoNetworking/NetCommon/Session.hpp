@@ -62,9 +62,9 @@ namespace NetCommon
         void Send(const Message& message)
         {
             boost::asio::post(_messageWriteStrand,
-                              [this, message]()
+                              [pSelf = shared_from_this(), message]()
                               {
-                                  PushToSendBuffer(message);
+                                  pSelf->PushToSendBuffer(message);
                               });
         }
 
@@ -259,9 +259,9 @@ namespace NetCommon
             }
 
             boost::asio::post(_messageWriteStrand,
-                              [this, error]
+                              [pSelf = shared_from_this(), error]
                               {
-                                  OnWriteMessageCompleted(error);
+                                  pSelf->OnWriteMessageCompleted(error);
                               });            
         }
 
@@ -289,9 +289,9 @@ namespace NetCommon
             }
 
             boost::asio::post(_messageWriteStrand,
-                              [this, error]
+                              [pSelf = shared_from_this(), error]
                               {
-                                  OnWriteMessageCompleted(error);
+                                  pSelf->OnWriteMessageCompleted(error);
                               });
         }
 
