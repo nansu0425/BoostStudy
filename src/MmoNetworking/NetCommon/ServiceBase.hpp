@@ -181,7 +181,7 @@ namespace NetCommon
 
             if (pSession->IsConnected())
             {
-                pSession->PushMessageToSendBuffer(message);
+                pSession->Send(message);
             }
             else
             {
@@ -201,7 +201,7 @@ namespace NetCommon
                 {
                     if (pSession != pIgnoredSession)
                     {
-                        pSession->PushMessageToSendBuffer(message);
+                        pSession->Send(message);
                     }
 
                     ++iter;

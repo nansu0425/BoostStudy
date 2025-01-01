@@ -59,12 +59,13 @@ namespace NetCommon
             ReadHeaderAsync();
         }
 
-        void PushMessageToSendBuffer(const Message& message)
+        void Send(const Message& message)
         {
-            auto messageWriteLock = std::lock_guard(_messageWriteLock);
-
-            _sendBuffer.push(message);
-            WriteMessageAsync();
+            boost::asio::post(_messageWriteStrand,
+                              [this, message]()
+                              {
+                                  PushToSendBuffer(message);
+                              });
         }
 
         Id GetId() const
@@ -106,6 +107,7 @@ namespace NetCommon
             , _ioContext(ioContext)
             , _socket(std::move(socket))
             , _isWritingMessage(false)
+            , _messageWriteStrand(boost::asio::make_strand(ioContext))
             , _receiveBuffer(receiveBuffer)
             , _receiveBufferStrand(receiveBufferStrand)
         {}
@@ -190,6 +192,13 @@ namespace NetCommon
             ReadHeaderAsync();
         }
 
+        void PushToSendBuffer(const Message& message)
+        {
+            _sendBuffer.push(message);
+
+            WriteMessageAsync();
+        }
+
         void WriteMessageAsync()
         {
             if (_isWritingMessage || 
@@ -207,8 +216,6 @@ namespace NetCommon
 
         void OnWriteMessageCompleted(const ErrorCode& error)
         {
-            auto messageWriteLock = std::lock_guard(_messageWriteLock);
-
             _isWritingMessage = false;
 
             if (!error)
@@ -251,7 +258,11 @@ namespace NetCommon
                 std::cerr << "[" << _id << "] Failed to write header: " << error << "\n";
             }
 
-            OnWriteMessageCompleted(error);
+            boost::asio::post(_messageWriteStrand,
+                              [this, error]
+                              {
+                                  OnWriteMessageCompleted(error);
+                              });            
         }
 
         void WritePayloadAsync()
@@ -277,7 +288,11 @@ namespace NetCommon
                 std::cerr << "[" << _id << "] Failed to write payload: " << error << "\n";
             }
 
-            OnWriteMessageCompleted(error);
+            boost::asio::post(_messageWriteStrand,
+                              [this, error]
+                              {
+                                  OnWriteMessageCompleted(error);
+                              });
         }
 
     private:
@@ -289,8 +304,8 @@ namespace NetCommon
         // Write message
         std::queue<Message>             _sendBuffer;
         Message                         _writeMessage;
-        std::mutex                      _messageWriteLock;
         bool                            _isWritingMessage;
+        Strand                          _messageWriteStrand;
 
         // Read message
         std::queue<OwnedMessage>&       _receiveBuffer;
