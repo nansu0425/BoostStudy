@@ -40,7 +40,7 @@ namespace NetCommon
 
         void Disconnect()
         {
-            std::lock_guard lockGuard(_socketLock);
+            auto socketLock = std::unique_lock(_socketLock);
             _socket.close();
         }
 
@@ -61,7 +61,7 @@ namespace NetCommon
 
         void PushMessageToSendBuffer(const Message& message)
         {
-            auto writeLock = std::lock_guard(_writeLock);
+            auto messageWriteLock = std::lock_guard(_messageWriteLock);
 
             _sendBuffer.push(message);
             WriteMessageAsync();
@@ -77,7 +77,7 @@ namespace NetCommon
             Tcp::endpoint endpoint;
 
             {
-                std::lock_guard lockGuard(_socketLock);
+                auto socketLock = std::shared_lock(_socketLock);
                 endpoint = _socket.remote_endpoint();
             }
 
@@ -89,7 +89,7 @@ namespace NetCommon
             Tcp::endpoint endpoint;
 
             {
-                std::lock_guard lockGuard(_socketLock);
+                auto socketLock = std::shared_lock(_socketLock);
                 endpoint = _socket.remote_endpoint(error);
             }
 
@@ -105,9 +105,9 @@ namespace NetCommon
             : _id(id)
             , _ioContext(ioContext)
             , _socket(std::move(socket))
+            , _isWritingMessage(false)
             , _receiveBuffer(receiveBuffer)
             , _receiveBufferStrand(receiveBufferStrand)
-            , _isWritingMessage(false)
         {}
 
         void ReadHeaderAsync()
@@ -205,12 +205,20 @@ namespace NetCommon
             _isWritingMessage = true;
         }
 
-        void OnWriteMessageCompleted()
+        void OnWriteMessageCompleted(const ErrorCode& error)
         {
-            auto writeLock = std::lock_guard(_writeLock);
+            auto messageWriteLock = std::lock_guard(_messageWriteLock);
 
             _isWritingMessage = false;
-            WriteMessageAsync();
+
+            if (!error)
+            {
+                WriteMessageAsync();
+            }
+            else
+            {
+                Disconnect();
+            }
         }
 
         void WriteHeaderAsync()
@@ -235,17 +243,15 @@ namespace NetCommon
                 if (_writeMessage.header.size > sizeof(MessageHeader))
                 {
                     WritePayloadAsync();
-                }
-                else
-                {
-                    OnWriteMessageCompleted();
+                    return;
                 }
             }
             else
             {
                 std::cerr << "[" << _id << "] Failed to write header: " << error << "\n";
-                Disconnect();
             }
+
+            OnWriteMessageCompleted(error);
         }
 
         void WritePayloadAsync()
@@ -265,27 +271,30 @@ namespace NetCommon
             if (!error)
             {
                 assert(nBytesTransferred == _writeMessage.payload.size());
-
-                OnWriteMessageCompleted();
             }
             else
             {
                 std::cerr << "[" << _id << "] Failed to write payload: " << error << "\n";
-                Disconnect();
             }
+
+            OnWriteMessageCompleted(error);
         }
 
     private:
         const Id                        _id;
         IoContext&                      _ioContext;
         Tcp::socket                     _socket;
-        std::mutex                      _socketLock;
+        std::shared_mutex               _socketLock;
+
+        // Write message
         std::queue<Message>             _sendBuffer;
-        std::mutex                      _writeLock;
+        Message                         _writeMessage;
+        std::mutex                      _messageWriteLock;
+        bool                            _isWritingMessage;
+
+        // Read message
         std::queue<OwnedMessage>&       _receiveBuffer;
         Strand&                         _receiveBufferStrand;
-        Message                         _writeMessage;
-        bool                            _isWritingMessage;
         Message                         _readMessage;
 
     };
