@@ -23,42 +23,16 @@ namespace NetCommon
         static Pointer Create(Id id,
                               boost::asio::io_context& ioContext,
                               Tcp::socket&& socket,
+                              std::function<void(Pointer)> onSessionDisconnected,
                               std::queue<OwnedMessage>& receiveBuffer,
                               Strand& receiveBufferStrand)
         {
             return Pointer(new Session(id, 
                                        ioContext, 
                                        std::move(socket),
+                                       onSessionDisconnected,
                                        receiveBuffer, 
                                        receiveBufferStrand));
-        }
-
-        void Connect(const Endpoints& endpoints)
-        {
-            boost::asio::connect(_socket, endpoints);
-        }
-
-        void Disconnect()
-        {
-            auto socketLock = std::unique_lock(_socketLock);
-            _socket.close();
-        }
-
-        bool IsConnected()
-        {
-            ErrorCode error;
-            GetEndpoint(error);
-
-            return !error;
-        }
-
-        void Receive()
-        {
-            boost::asio::post(_receiveStrand,
-                              [pSelf = shared_from_this()]
-                              {
-                                  pSelf->ReadMessageAsync();
-                              });
         }
 
         void Send(const Message& message)
@@ -75,68 +49,67 @@ namespace NetCommon
             return _id;
         }
 
-        Tcp::endpoint GetEndpoint()
+        const Tcp::endpoint& GetEndpoint() const
         {
-            Tcp::endpoint endpoint;
-
-            {
-                auto socketLock = std::shared_lock(_socketLock);
-                endpoint = _socket.remote_endpoint();
-            }
-
-            return endpoint;
-        }
-
-        Tcp::endpoint GetEndpoint(ErrorCode& error)
-        {
-            Tcp::endpoint endpoint;
-
-            {
-                auto socketLock = std::shared_lock(_socketLock);
-                endpoint = _socket.remote_endpoint(error);
-            }
-
-            return endpoint;
+            return _endpoint;
         }
 
     private:
         Session(Id id,
                 boost::asio::io_context& ioContext,
                 Tcp::socket&& socket,
+                std::function<void(Pointer)> onSessionDisconnected,
                 std::queue<OwnedMessage>& receiveBuffer,
                 Strand& receiveBufferStrand)
             : _id(id)
             , _ioContext(ioContext)
             , _socket(std::move(socket))
+            , _socketStrand(boost::asio::make_strand(ioContext))
+            , _endpoint(_socket.remote_endpoint())
+            , _onSessionDisconnected(onSessionDisconnected)
             , _receiveBuffer(receiveBuffer)
             , _receiveStrand(receiveBufferStrand)
-            , _isReadingMessage(false)
             , _sendStrand(boost::asio::make_strand(ioContext))
             , _isWritingMessage(false)
-        {}
+        {
+            ReadMessageAsync();
+        }
+
+        void Close()
+        {
+            if (_socket.is_open())
+            {
+                _socket.close();
+                _onSessionDisconnected(shared_from_this());
+            }
+        }
 
         void ReadMessageAsync()
         {
-            if (_isReadingMessage)
-            {
-                return;
-            }
-
-            ReadHeaderAsync();
-            _isReadingMessage = true;
+            boost::asio::post(_socketStrand,
+                              [pSelf = shared_from_this()]()
+                              {
+                                  pSelf->ReadHeaderAsync();
+                              });
         }
 
         void OnReadMessageCompleted(const ErrorCode& error)
         {
-            _isReadingMessage = false;
-
             if (!error)
             {
-                PushMessageToReceiveBuffer();
+                boost::asio::post(_receiveStrand,
+                                  [pSelf = shared_from_this()]
+                                  {
+                                      pSelf->PushMessageToReceiveBuffer();
+                                  });
             }
             else
             {
-                Disconnect();
+                boost::asio::post(_socketStrand,
+                                  [pSelf = shared_from_this()]()
+                                  {
+                                      pSelf->Close();
+                                  });
             }
         }
 
@@ -163,7 +136,12 @@ namespace NetCommon
                 if (_readMessage.header.size > sizeof(MessageHeader))
                 {
                     _readMessage.payload.resize(_readMessage.header.size - sizeof(MessageHeader));
-                    ReadPayloadAsync();
+
+                    boost::asio::post(_socketStrand,
+                                      [pSelf = shared_from_this()]()
+                                      {
+                                          pSelf->ReadPayloadAsync();
+                                      });
 
                     return;
                 }
@@ -173,11 +151,7 @@ namespace NetCommon
                 std::cerr << "[" << _id << "] Failed to read header: " << error << "\n";
             }
 
-            boost::asio::post(_receiveStrand,
-                              [pSelf = shared_from_this(), error]()
-                              {
-                                  pSelf->OnReadMessageCompleted(error);
-                              });
+            OnReadMessageCompleted(error);
         }
 
         void ReadPayloadAsync()
@@ -203,11 +177,7 @@ namespace NetCommon
                 std::cerr << "[" << _id << "] Failed to read payload: " << error << "\n";
             }
 
-            boost::asio::post(_receiveStrand,
-                              [pSelf = shared_from_this(), error]()
-                              {
-                                  pSelf->OnReadMessageCompleted(error);
-                              });
+            OnReadMessageCompleted(error);
         }
 
         void PushMessageToReceiveBuffer()
@@ -225,8 +195,6 @@ namespace NetCommon
                                   pSelf->OnPushToReceiveBufferStarted();
                               });
         }
-
-        
 
         void OnPushToReceiveBufferStarted()
         {
@@ -253,7 +221,12 @@ namespace NetCommon
             _writeMessage = std::move(_sendBuffer.front());
             _sendBuffer.pop();
 
-            WriteHeaderAsync();
+            boost::asio::post(_socketStrand,
+                              [pSelf = shared_from_this()]()
+                              {
+                                  pSelf->WriteHeaderAsync();
+                              });
+
             _isWritingMessage = true;
         }
 
@@ -267,7 +240,11 @@ namespace NetCommon
             }
             else
             {
-                Disconnect();
+                boost::asio::post(_socketStrand,
+                                  [pSelf = shared_from_this()]()
+                                  {
+                                      pSelf->Close();
+                                  });
             }
         }
 
@@ -292,7 +269,12 @@ namespace NetCommon
                 // The size of payload is bigger than 0
                 if (_writeMessage.header.size > sizeof(MessageHeader))
                 {
-                    WritePayloadAsync();
+                    boost::asio::post(_socketStrand,
+                                      [pSelf = shared_from_this()]()
+                                      {
+                                          pSelf->WritePayloadAsync();
+                                      });
+                    
                     return;
                 }
             }
@@ -342,13 +324,16 @@ namespace NetCommon
         const Id                        _id;
         IoContext&                      _ioContext;
         Tcp::socket                     _socket;
-        std::shared_mutex               _socketLock;
+        Strand                          _socketStrand;
+        const Tcp::endpoint             _endpoint;
+
+        // Close
+        std::function<void(Pointer)>    _onSessionDisconnected;
 
         // Receive
         std::queue<OwnedMessage>&       _receiveBuffer;
         Strand&                         _receiveStrand;
         Message                         _readMessage;
-        bool                            _isReadingMessage;
 
         // Send
         std::queue<Message>             _sendBuffer;
