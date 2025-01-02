@@ -37,7 +37,7 @@ namespace NetCommon
                                                           _ioContext,
                                                           Tcp::socket(_ioContext),
                                                           _receiveBuffer,
-                                                          _receiveBufferStrand);
+                                                          _receiveStrand);
                 pSession->Connect(endpoints);
 
                 std::cout << "[CLIENT] New session: " << pSession->GetEndpoint() << "\n";

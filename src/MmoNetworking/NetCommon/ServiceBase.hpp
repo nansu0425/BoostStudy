@@ -19,7 +19,7 @@ namespace NetCommon
         ServiceBase()
             : _workGuard(boost::asio::make_work_guard(_ioContext))
             , _sessionsStrand(boost::asio::make_strand(_ioContext))
-            , _receiveBufferStrand(boost::asio::make_strand(_ioContext))
+            , _receiveStrand(boost::asio::make_strand(_ioContext))
         {
             RunWorker();
         }
@@ -35,7 +35,7 @@ namespace NetCommon
             std::promise<bool> resultPromise;
             std::future<bool> resultFuture = resultPromise.get_future();
 
-            boost::asio::post(_receiveBufferStrand,
+            boost::asio::post(_receiveStrand,
                               [this, nMaxMessages, &resultPromise]()
                               {
                                   OnFetchReceivedMessagesStarted(resultPromise, nMaxMessages);
@@ -166,7 +166,7 @@ namespace NetCommon
         {
             assert(_sessions.count(pSession->GetId()) == 1);
 
-            pSession->ReadAsync();
+            pSession->Receive();
             std::cout << "[" << pSession->GetId() << "] Session registered\n";
         }
 
@@ -269,8 +269,10 @@ namespace NetCommon
         std::thread                     _worker;
         SessionMap                      _sessions;
         Strand                          _sessionsStrand;
+
+        // Receive
         std::queue<OwnedMessage>        _receiveBuffer;
-        Strand                          _receiveBufferStrand;
+        Strand                          _receiveStrand;
         std::queue<OwnedMessage>        _receivedMessages;
 
     };

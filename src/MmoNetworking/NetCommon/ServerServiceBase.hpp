@@ -46,7 +46,7 @@ namespace NetCommon
                                                           _ioContext,
                                                           std::move(socket),
                                                           _receiveBuffer,
-                                                          _receiveBufferStrand);
+                                                          _receiveStrand);
 
                 std::cout << "[SERVER] New session: " << pSession->GetEndpoint() << "\n";
 

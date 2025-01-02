@@ -52,19 +52,21 @@ namespace NetCommon
             return !error;
         }
 
-        void ReadAsync()
+        void Receive()
         {
-            assert(IsConnected());
-
-            ReadHeaderAsync();
+            boost::asio::post(_receiveStrand,
+                              [pSelf = shared_from_this()]
+                              {
+                                  pSelf->ReadMessageAsync();
+                              });
         }
 
         void Send(const Message& message)
         {
-            boost::asio::post(_messageWriteStrand,
+            boost::asio::post(_sendStrand,
                               [pSelf = shared_from_this(), message]()
                               {
-                                  pSelf->PushToSendBuffer(message);
+                                  pSelf->PushMessageToSendBuffer(message);
                               });
         }
 
@@ -106,11 +108,37 @@ namespace NetCommon
             : _id(id)
             , _ioContext(ioContext)
             , _socket(std::move(socket))
-            , _isWritingMessage(false)
-            , _messageWriteStrand(boost::asio::make_strand(ioContext))
             , _receiveBuffer(receiveBuffer)
-            , _receiveBufferStrand(receiveBufferStrand)
+            , _receiveStrand(receiveBufferStrand)
+            , _isReadingMessage(false)
+            , _sendStrand(boost::asio::make_strand(ioContext))
+            , _isWritingMessage(false)
         {}
+
+        void ReadMessageAsync()
+        {
+            if (_isReadingMessage)
+            {
+                return;
+            }
+
+            ReadHeaderAsync();
+            _isReadingMessage = true;
+        }
+
+        void OnReadMessageCompleted(const ErrorCode& error)
+        {
+            _isReadingMessage = false;
+
+            if (!error)
+            {
+                PushMessageToReceiveBuffer();
+            }
+            else
+            {
+                Disconnect();
+            }
+        }
 
         void ReadHeaderAsync()
         {
@@ -136,17 +164,20 @@ namespace NetCommon
                 {
                     _readMessage.payload.resize(_readMessage.header.size - sizeof(MessageHeader));
                     ReadPayloadAsync();
-                }
-                else
-                {
-                    PushToReceiveBufferAsync();
+
+                    return;
                 }
             }
             else
             {
                 std::cerr << "[" << _id << "] Failed to read header: " << error << "\n";
-                Disconnect();
             }
+
+            boost::asio::post(_receiveStrand,
+                              [pSelf = shared_from_this(), error]()
+                              {
+                                  pSelf->OnReadMessageCompleted(error);
+                              });
         }
 
         void ReadPayloadAsync()
@@ -166,24 +197,36 @@ namespace NetCommon
             if (!error)
             {
                 assert(_readMessage.payload.size() == nBytesTransferred);
-
-                PushToReceiveBufferAsync();
             }
             else
             {
                 std::cerr << "[" << _id << "] Failed to read payload: " << error << "\n";
-                Disconnect();
             }
+
+            boost::asio::post(_receiveStrand,
+                              [pSelf = shared_from_this(), error]()
+                              {
+                                  pSelf->OnReadMessageCompleted(error);
+                              });
+        }
+
+        void PushMessageToReceiveBuffer()
+        {
+            _receiveBuffer.push(OwnedMessage{shared_from_this(), _readMessage});
+
+            ReadMessageAsync();
         }
 
         void PushToReceiveBufferAsync()
         {
-            boost::asio::post(_receiveBufferStrand,
+            boost::asio::post(_receiveStrand,
                               [pSelf = shared_from_this()]()
                               {
                                   pSelf->OnPushToReceiveBufferStarted();
                               });
         }
+
+        
 
         void OnPushToReceiveBufferStarted()
         {
@@ -192,7 +235,7 @@ namespace NetCommon
             ReadHeaderAsync();
         }
 
-        void PushToSendBuffer(const Message& message)
+        void PushMessageToSendBuffer(const Message& message)
         {
             _sendBuffer.push(message);
 
@@ -258,7 +301,7 @@ namespace NetCommon
                 std::cerr << "[" << _id << "] Failed to write header: " << error << "\n";
             }
 
-            boost::asio::post(_messageWriteStrand,
+            boost::asio::post(_sendStrand,
                               [pSelf = shared_from_this(), error]
                               {
                                   pSelf->OnWriteMessageCompleted(error);
@@ -288,7 +331,7 @@ namespace NetCommon
                 std::cerr << "[" << _id << "] Failed to write payload: " << error << "\n";
             }
 
-            boost::asio::post(_messageWriteStrand,
+            boost::asio::post(_sendStrand,
                               [pSelf = shared_from_this(), error]
                               {
                                   pSelf->OnWriteMessageCompleted(error);
@@ -301,16 +344,17 @@ namespace NetCommon
         Tcp::socket                     _socket;
         std::shared_mutex               _socketLock;
 
-        // Write message
+        // Receive
+        std::queue<OwnedMessage>&       _receiveBuffer;
+        Strand&                         _receiveStrand;
+        Message                         _readMessage;
+        bool                            _isReadingMessage;
+
+        // Send
         std::queue<Message>             _sendBuffer;
+        Strand                          _sendStrand;
         Message                         _writeMessage;
         bool                            _isWritingMessage;
-        Strand                          _messageWriteStrand;
-
-        // Read message
-        std::queue<OwnedMessage>&       _receiveBuffer;
-        Strand&                         _receiveBufferStrand;
-        Message                         _readMessage;
 
     };
 }
