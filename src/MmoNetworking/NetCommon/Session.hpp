@@ -23,24 +23,38 @@ namespace NetCommon
         static Pointer Create(Id id,
                               boost::asio::io_context& ioContext,
                               Tcp::socket&& socket,
-                              std::function<void(Pointer)> onSessionDisconnected,
+                              std::function<void(Pointer)> onSessionClosed,
                               std::queue<OwnedMessage>& receiveBuffer,
                               Strand& receiveBufferStrand)
         {
             return Pointer(new Session(id, 
                                        ioContext, 
                                        std::move(socket),
-                                       onSessionDisconnected,
+                                       onSessionClosed,
                                        receiveBuffer, 
                                        receiveBufferStrand));
         }
 
-        void Send(const Message& message)
+        void ReceiveMessageAsync()
+        {
+            ReadMessageAsync();
+        }
+
+        void SendMessageAsync(const Message& message)
         {
             boost::asio::post(_sendStrand,
                               [pSelf = shared_from_this(), message]()
                               {
                                   pSelf->PushMessageToSendBuffer(message);
+                              });
+        }
+
+        void CloseAsync()
+        {
+            boost::asio::post(_socketStrand,
+                              [pSelf = shared_from_this()]()
+                              {
+                                  pSelf->Close();
                               });
         }
 
@@ -58,7 +72,7 @@ namespace NetCommon
         Session(Id id,
                 boost::asio::io_context& ioContext,
                 Tcp::socket&& socket,
-                std::function<void(Pointer)> onSessionDisconnected,
+                std::function<void(Pointer)> onSessionClosed,
                 std::queue<OwnedMessage>& receiveBuffer,
                 Strand& receiveBufferStrand)
             : _id(id)
@@ -66,21 +80,19 @@ namespace NetCommon
             , _socket(std::move(socket))
             , _socketStrand(boost::asio::make_strand(ioContext))
             , _endpoint(_socket.remote_endpoint())
-            , _onSessionDisconnected(onSessionDisconnected)
+            , _onSessionClose(onSessionClosed)
             , _receiveBuffer(receiveBuffer)
             , _receiveStrand(receiveBufferStrand)
             , _sendStrand(boost::asio::make_strand(ioContext))
             , _isWritingMessage(false)
-        {
-            ReadMessageAsync();
-        }
+        {}
 
         void Close()
         {
             if (_socket.is_open())
             {
                 _socket.close();
-                _onSessionDisconnected(shared_from_this());
+                _onSessionClose(shared_from_this());
             }
         }
 
@@ -105,11 +117,7 @@ namespace NetCommon
             }
             else
             {
-                boost::asio::post(_socketStrand,
-                                  [pSelf = shared_from_this()]()
-                                  {
-                                      pSelf->Close();
-                                  });
+                CloseAsync();
             }
         }
 
@@ -240,11 +248,7 @@ namespace NetCommon
             }
             else
             {
-                boost::asio::post(_socketStrand,
-                                  [pSelf = shared_from_this()]()
-                                  {
-                                      pSelf->Close();
-                                  });
+                CloseAsync();
             }
         }
 
@@ -328,7 +332,7 @@ namespace NetCommon
         const Tcp::endpoint             _endpoint;
 
         // Close
-        std::function<void(Pointer)>    _onSessionDisconnected;
+        std::function<void(Pointer)>    _onSessionClose;
 
         // Receive
         std::queue<OwnedMessage>&       _receiveBuffer;

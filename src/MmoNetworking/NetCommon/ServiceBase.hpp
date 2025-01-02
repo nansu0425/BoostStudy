@@ -26,7 +26,6 @@ namespace NetCommon
 
         virtual ~ServiceBase()
         {
-            DisconnectAll();
             StopWorker();
         }
 
@@ -38,61 +37,54 @@ namespace NetCommon
             boost::asio::post(_receiveStrand,
                               [this, nMaxMessages, &resultPromise]()
                               {
-                                  OnFetchReceivedMessagesStarted(resultPromise, nMaxMessages);
+                                  FetchReceivedMessages(resultPromise, nMaxMessages);
                               });
 
             return resultFuture.get();
         }
 
-    protected:
-        virtual bool OnSessionConnected(SessionPointer pSession) = 0;
-        virtual void OnSessionDisconnected(SessionPointer pSession) = 0;
-        virtual void OnMessageReceived(SessionPointer pSession, Message& message) = 0;
-        virtual bool OnUpdateStarted() = 0;
-
-        void SendAsync(SessionPointer pSession, const Message& message)
+        void SendMessageAsync(SessionPointer pSession, const Message& message)
         {
-            boost::asio::post([this, pSession, &message]()
-                              {
-                                  OnSendStarted(pSession, message);
-                              });
+            assert(pSession != nullptr);
+
+            pSession->SendMessageAsync(message);
         }
 
-        void BroadcastAsync(const Message& message, SessionPointer pIgnoredSession = nullptr)
+        void BroadcastMessageAsync(const Message& message, SessionPointer pIgnoredSession = nullptr)
         {
             boost::asio::post(_sessionsStrand,
                               [this, &message, pIgnoredSession]()
                               {
-                                  OnBroadcastStarted(message, pIgnoredSession);
+                                  BroadcastMessage(message, pIgnoredSession);
                               });
         }
 
-        void Disconnect(SessionPointer pSession)
+    protected:
+        virtual bool OnSessionConnected(SessionPointer pSession) = 0;
+        virtual void OnSessionRegistered(SessionPointer pSession) = 0;
+        virtual void OnSessionDisconnected(SessionPointer pSession) = 0;
+        virtual void OnMessageReceived(SessionPointer pSession, Message& message) = 0;
+        virtual bool OnUpdateStarted() = 0;
+
+        SessionPointer CreateSession(Tcp::socket&& socket)
         {
-            pSession->Disconnect();
-            OnSessionDisconnected(pSession);
+            auto onSessionClosed = [this](SessionPointer pSession)
+                                   {
+                                       boost::asio::post(_sessionsStrand,
+                                                         [this, pSession]()
+                                                         {
+                                                             UnregisterSession(pSession);
+                                                         });
+                                   };
 
-            EraseSessionAsync(pSession);
-        }
+            SessionPointer pSession = Session::Create(AssignId(),
+                                                      _ioContext,
+                                                      std::move(socket),
+                                                      std::move(onSessionClosed),
+                                                      _receiveBuffer,
+                                                      _receiveStrand);
 
-        void DisconnectAll()
-        {
-            for (auto& pair : _sessions)
-            {
-                SessionPointer pSession = pair.second;
-
-                pSession->Disconnect();
-                OnSessionDisconnected(pSession);
-            }
-
-            ClearSessionsAsync();
-        }
-
-        bool IsConnected(SessionPointer pSession) const
-        {
-            return (pSession)
-                   ? pSession->IsConnected()
-                   : false;
+            return pSession;
         }
 
         SessionId AssignId()
@@ -104,12 +96,26 @@ namespace NetCommon
             return assignedId;
         }
 
-        void RegisterSessionAsync(SessionPointer pSession)
+        void RegisterSessionAsync(SessionPointer pSession) 
         {
             boost::asio::post(_sessionsStrand, 
                               [this, pSession]()
                               {
-                                  OnRegisterSessionStarted(pSession);
+                                  RegisterSession(pSession);
+                              });
+        }
+
+        void DisconnectSessionAsync(SessionPointer pSession)
+        {
+            pSession->CloseAsync();
+        }
+
+        void DisconnectAllSessionsAsync()
+        {
+            boost::asio::post(_sessionsStrand,
+                              [this]()
+                              {
+                                  DisconnectAllSessions();
                               });
         }
 
@@ -132,89 +138,45 @@ namespace NetCommon
             }
         }
 
-        void EraseSessionAsync(SessionPointer pSession)
+        void DisconnectAllSessions()
         {
-            boost::asio::post(_sessionsStrand,
-                              [this, pSession]()
-                              {
-                                  OnEraseSessionStarted(pSession);
-                              });
+            for (auto& pair : _sessions)
+            {
+                SessionPointer pSession = pair.second;
+                pSession->CloseAsync();
+            }
         }
 
-        void OnEraseSessionStarted(SessionPointer pSession)
-        {
-            _sessions.erase(pSession->GetId());
-        }
-
-        void ClearSessionsAsync()
-        {
-            boost::asio::post(_sessionsStrand,
-                              [this]()
-                              {
-                                  OnClearSessionsStarted();
-                              });
-        }
-
-        void OnRegisterSessionStarted(SessionPointer pSession)
-        {
-            _sessions[pSession->GetId()] = pSession;
-
-            OnRegisterSessionCompleted(pSession);
-        }
-
-        void OnRegisterSessionCompleted(SessionPointer pSession)
+        void UnregisterSession(SessionPointer pSession)
         {
             assert(_sessions.count(pSession->GetId()) == 1);
 
-            pSession->Receive();
-            std::cout << "[" << pSession->GetId() << "] Session registered\n";
+            _sessions.erase(pSession->GetId());
+            OnSessionDisconnected(pSession);
         }
 
-        void OnClearSessionsStarted()
+        void RegisterSession(SessionPointer pSession)
         {
-            _sessions.clear();
+            _sessions[pSession->GetId()] = pSession;
+            pSession->ReceiveMessageAsync();
+
+            OnSessionRegistered(pSession);
         }
 
-        void OnSendStarted(SessionPointer pSession, const Message& message)
+        void BroadcastMessage(const Message& message, SessionPointer pIgnoredSession)
         {
-            assert(pSession != nullptr);
-
-            if (pSession->IsConnected())
+            for (auto& pair : _sessions)
             {
-                pSession->Send(message);
-            }
-            else
-            {
-                OnSessionDisconnected(pSession);
-                EraseSessionAsync(pSession);
-            }
-        }
+                SessionPointer pSession = pair.second;
 
-        void OnBroadcastStarted(const Message& message, SessionPointer pIgnoredSession)
-        {
-            for (auto iter = _sessions.begin(); iter != _sessions.end();)
-            {
-                SessionPointer pSession = iter->second;
-                assert(pSession != nullptr);
-
-                if (pSession->IsConnected())
+                if (pSession != pIgnoredSession)
                 {
-                    if (pSession != pIgnoredSession)
-                    {
-                        pSession->Send(message);
-                    }
-
-                    ++iter;
-                }
-                else
-                {
-                    OnSessionDisconnected(pSession);
-                    EraseSessionAsync(pSession);
+                    pSession->SendMessageAsync(message);
                 }
             }
         }
 
-        void OnFetchReceivedMessagesStarted(std::promise<bool>& updateResult, size_t nMaxMessages)
+        void FetchReceivedMessages(std::promise<bool>& updateResult, size_t nMaxMessages)
         {
             if (nMaxMessages == 0)
             {
@@ -234,18 +196,13 @@ namespace NetCommon
                 }
             }
 
-            OnFetchReceivedMessagesCompleted(updateResult);
-        }
-
-        void OnFetchReceivedMessagesCompleted(std::promise<bool>& updateResult)
-        {
             boost::asio::post([this, &updateResult]()
-                              {
-                                  OnProcessReceivedMessagesStarted(updateResult);
-                              });
+                               {
+                                    ProcessReceivedMessages(updateResult);
+                               });
         }
 
-        void OnProcessReceivedMessagesStarted(std::promise<bool>& updateResult)
+        void ProcessReceivedMessages(std::promise<bool>& updateResult)
         {
             while (!_receivedMessages.empty())
             {
@@ -255,11 +212,6 @@ namespace NetCommon
                 OnMessageReceived(receiveMessage.pOwner, receiveMessage.message);
             }
 
-            OnProcessReceivedMessagesCompleted(updateResult);
-        }
-
-        void OnProcessReceivedMessagesCompleted(std::promise<bool>& updateResult)
-        {
             updateResult.set_value(OnUpdateStarted());
         }
 

@@ -17,11 +17,19 @@ namespace Server
     protected:
         virtual bool OnSessionConnected(SessionPointer pSession) override
         {
+            std::cout << "[" << pSession->GetId() << "] Session connected\n";
             return true;
         }
 
+        virtual void OnSessionRegistered(SessionPointer pSession) override
+        {
+            std::cout << "[" << pSession->GetId() << "] Session registered\n";
+        }
+
         virtual void OnSessionDisconnected(SessionPointer pSession) override
-        {}
+        {
+            std::cout << "[" << pSession->GetId() << "] Session disconnected\n";
+        }
 
         virtual void OnMessageReceived(SessionPointer pSession, Message& message) override
         {}

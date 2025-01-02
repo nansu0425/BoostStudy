@@ -42,12 +42,7 @@ namespace NetCommon
         {
             if (!error)
             {
-                SessionPointer pSession = Session::Create(AssignId(),
-                                                          _ioContext,
-                                                          std::move(socket),
-                                                          _receiveBuffer,
-                                                          _receiveStrand);
-
+                SessionPointer pSession = CreateSession(std::move(socket));
                 std::cout << "[SERVER] New session: " << pSession->GetEndpoint() << "\n";
 
                 if (OnSessionConnected(pSession))

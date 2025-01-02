@@ -33,13 +33,10 @@ namespace NetCommon
         {
             try
             {
-                SessionPointer pSession = Session::Create(AssignId(),
-                                                          _ioContext,
-                                                          Tcp::socket(_ioContext),
-                                                          _receiveBuffer,
-                                                          _receiveStrand);
-                pSession->Connect(endpoints);
+                Tcp::socket socket(_ioContext);
+                boost::asio::connect(socket, endpoints);
 
+                SessionPointer pSession = CreateSession(std::move(socket));
                 std::cout << "[CLIENT] New session: " << pSession->GetEndpoint() << "\n";
 
                 if (OnSessionConnected(pSession))
