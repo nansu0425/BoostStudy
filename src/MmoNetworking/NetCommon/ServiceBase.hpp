@@ -63,7 +63,7 @@ namespace NetCommon
         virtual bool OnSessionCreated(SessionPointer pSession) = 0;
         virtual void OnSessionRegistered(SessionPointer pSession) = 0;
         virtual void OnSessionUnregistered(SessionPointer pSession) = 0;
-        virtual void OnMessageReceived(SessionPointer pSession, Message& message) = 0;
+        virtual void HandleReceivedMessage(SessionPointer pSession, Message& message) = 0;
         virtual bool OnUpdateCompleted() = 0;
 
         void CreateSession(Tcp::socket&& socket)
@@ -209,18 +209,18 @@ namespace NetCommon
 
             boost::asio::post([this, nMaxReceivedMessages]()
                               {
-                                   HandleReceivedMessages(nMaxReceivedMessages);
+                                   DispatchReceivedMessages(nMaxReceivedMessages);
                               });
         }
 
-        void HandleReceivedMessages(size_t nMaxReceivedMessages)
+        void DispatchReceivedMessages(size_t nMaxReceivedMessages)
         {
             while (!_receivedMessages.empty())
             {
                 OwnedMessage receiveMessage = std::move(_receivedMessages.front());
                 _receivedMessages.pop();
 
-                OnMessageReceived(receiveMessage.pOwner, receiveMessage.message);
+                HandleReceivedMessage(receiveMessage.pOwner, receiveMessage.message);
             }
 
             if (OnUpdateCompleted())

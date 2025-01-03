@@ -28,14 +28,14 @@ namespace Server
         virtual void OnSessionUnregistered(SessionPointer pSession) override
         {}
 
-        virtual void OnMessageReceived(SessionPointer pSession, Message& message) override
+        virtual void HandleReceivedMessage(SessionPointer pSession, Message& message) override
         {
             Client::MessageId messageId = static_cast<Client::MessageId>(message.header.id);
 
             switch (messageId)
             {
             case Client::MessageId::Ping:
-                HandlePing(pSession);
+                Ping(pSession);
                 break;
             default:
                 break;
@@ -48,7 +48,7 @@ namespace Server
         }
 
     private:
-        void HandlePing(SessionPointer pSession)
+        void Ping(SessionPointer pSession)
         {
             Message message;
             message.header.id = static_cast<NetCommon::MessageId>(MessageId::Ping);

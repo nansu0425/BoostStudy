@@ -33,7 +33,7 @@ namespace Client
         virtual void OnSessionUnregistered(SessionPointer pSession) override
         {}
 
-        virtual void OnMessageReceived(SessionPointer pSession, Message& message) override
+        virtual void HandleReceivedMessage(SessionPointer pSession, Message& message) override
         {
             Server::MessageId messageId = static_cast<Server::MessageId>(message.header.id);
 
