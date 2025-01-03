@@ -10,7 +10,6 @@ namespace Server
     {
     private:
         using Message       = NetCommon::Message;
-        using TimePoint     = std::chrono::system_clock::time_point;
 
     public:
         Service(uint16_t port)
@@ -53,9 +52,6 @@ namespace Server
         {
             Message message;
             message.header.id = static_cast<NetCommon::MessageId>(MessageId::Ping);
-
-            TimePoint now = std::chrono::system_clock::now();
-            message << now;
 
             SendMessageAsync(pSession, message);
         }

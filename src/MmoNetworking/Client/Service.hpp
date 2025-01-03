@@ -10,7 +10,14 @@ namespace Client
     {
     private:
         using Message       = NetCommon::Message;
-        using TimePoint     = std::chrono::system_clock::time_point;
+        using TimePoint     = std::chrono::steady_clock::time_point;
+        using Timer         = boost::asio::steady_timer;
+
+    public:
+        Service()
+            : ClientServiceBase()
+            , _timer(_ioContext)
+        {}
 
     protected:
         virtual bool OnSessionCreated(SessionPointer pSession) override
@@ -48,29 +55,31 @@ namespace Client
     private:
         void Ping(SessionPointer pSession)
         {
+            _start = std::chrono::steady_clock::now();
+
             Message message;
             message.header.id = static_cast<NetCommon::MessageId>(MessageId::Ping);
-
-            _start = std::chrono::system_clock::now();
-            message << _start;
 
             SendMessageAsync(pSession, message);
         }
 
         void HandlePing(SessionPointer pSession, Message& message)
         {
-            TimePoint end;
-            message >> end;
+            TimePoint end = std::chrono::steady_clock::now();
 
             auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(end - _start);;
-            std::cout << "[" << pSession->GetId() << "] Ping " << elapsed.count() << "us \n";
+            std::cout << pSession << " Ping: " << elapsed.count() << "us \n";
 
-            std::this_thread::sleep_for(std::chrono::seconds(1));
-            Ping(pSession);
+            _timer.expires_after(std::chrono::seconds(1));
+            _timer.async_wait([this, pSession](const ErrorCode& error)
+                              {
+                                  Ping(pSession);
+                              });
         }
 
     private:
-        TimePoint _start;
+        TimePoint       _start;
+        Timer           _timer;
     
     };
 }
