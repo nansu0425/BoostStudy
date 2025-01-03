@@ -209,11 +209,11 @@ namespace NetCommon
 
             boost::asio::post([this, nMaxReceivedMessages]()
                               {
-                                   ProcessReceivedMessages(nMaxReceivedMessages);
+                                   HandleReceivedMessages(nMaxReceivedMessages);
                               });
         }
 
-        void ProcessReceivedMessages(size_t nMaxReceivedMessages)
+        void HandleReceivedMessages(size_t nMaxReceivedMessages)
         {
             while (!_receivedMessages.empty())
             {

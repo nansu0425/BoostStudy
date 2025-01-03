@@ -27,7 +27,7 @@ namespace Client
 
         virtual void OnSessionRegistered(SessionPointer pSession) override
         {
-            Ping(pSession);
+            PingAsync(pSession);
         }
 
         virtual void OnSessionUnregistered(SessionPointer pSession) override
@@ -40,7 +40,7 @@ namespace Client
             switch (messageId)
             {
             case Server::MessageId::Ping:
-                HandlePing(pSession, message);
+                OnPingCompleted(pSession, message);
                 break;
             default:
                 break;
@@ -53,7 +53,7 @@ namespace Client
         }
 
     private:
-        void Ping(SessionPointer pSession)
+        void PingAsync(SessionPointer pSession)
         {
             _start = std::chrono::steady_clock::now();
 
@@ -63,7 +63,7 @@ namespace Client
             SendMessageAsync(pSession, message);
         }
 
-        void HandlePing(SessionPointer pSession, Message& message)
+        void OnPingCompleted(SessionPointer pSession, Message& message)
         {
             TimePoint end = std::chrono::steady_clock::now();
 
@@ -73,7 +73,7 @@ namespace Client
             _timer.expires_after(std::chrono::seconds(1));
             _timer.async_wait([this, pSession](const ErrorCode& error)
                               {
-                                  Ping(pSession);
+                                  PingAsync(pSession);
                               });
         }
 
