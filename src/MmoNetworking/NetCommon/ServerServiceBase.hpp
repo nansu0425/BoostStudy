@@ -7,9 +7,9 @@ namespace NetCommon
     class ServerServiceBase : public ServiceBase
     {
     public:
-        ServerServiceBase(uint16_t port)
-            : ServiceBase()
-            , _acceptor(_ioContext, Tcp::endpoint(Tcp::v4(), port))
+        ServerServiceBase(size_t nWorkers, uint16_t port)
+            : ServiceBase(nWorkers)
+            , _acceptor(_workers, Tcp::endpoint(Tcp::v4(), port))
         {}
 
         void Start()

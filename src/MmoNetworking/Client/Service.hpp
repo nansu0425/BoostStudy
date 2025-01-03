@@ -14,9 +14,9 @@ namespace Client
         using Timer         = boost::asio::steady_timer;
 
     public:
-        Service()
-            : ClientServiceBase()
-            , _timer(_ioContext)
+        Service(size_t nWorkers)
+            : ClientServiceBase(nWorkers)
+            , _timer(_workers)
         {}
 
     protected:

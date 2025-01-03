@@ -7,13 +7,13 @@ namespace NetCommon
     class ClientServiceBase : public ServiceBase
     {
     protected:
-        using Endpoints             = boost::asio::ip::basic_resolver_results<Tcp>;
+        using Endpoints         = boost::asio::ip::basic_resolver_results<Tcp>;
 
     public:
-        ClientServiceBase()
-            : ServiceBase()
-            , _socket(_ioContext)
-            , _resolver(_ioContext)
+        ClientServiceBase(size_t nWorkers)
+            : ServiceBase(nWorkers)
+            , _socket(_workers)
+            , _resolver(_workers)
         {}
 
         void Start(std::string_view host, std::string_view service)

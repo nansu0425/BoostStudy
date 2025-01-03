@@ -7,24 +7,23 @@ namespace NetCommon
     class ServiceBase
     {
     protected:
-        using IoContext             = boost::asio::io_context;
-        using ThreadPool            = std::thread;
+        using ThreadPool            = boost::asio::thread_pool;
+        using WorkGuard             = boost::asio::executor_work_guard<ThreadPool::executor_type>;
+        using Strand                = boost::asio::strand<ThreadPool::executor_type>;
+        using ErrorCode             = boost::system::error_code;
+        using Tcp                   = boost::asio::ip::tcp;
         using SessionPointer        = Session::Pointer;
         using SessionId             = Session::Id;
         using SessionMap            = std::unordered_map<SessionId, SessionPointer>;
-        using Strand                = boost::asio::strand<boost::asio::io_context::executor_type>;
-        using WorkGuard             = boost::asio::executor_work_guard< boost::asio::io_context::executor_type>;
-        using ErrorCode             = boost::system::error_code;
-        using Tcp                   = boost::asio::ip::tcp;
 
     public:
-        ServiceBase()
-            : _workGuard(boost::asio::make_work_guard(_ioContext))
-            , _sessionsStrand(boost::asio::make_strand(_ioContext))
-            , _receiveStrand(boost::asio::make_strand(_ioContext))
+        ServiceBase(size_t nWorkers)
+            : _workers(nWorkers)
+            , _workGuard(boost::asio::make_work_guard(_workers))
+            , _sessionsStrand(boost::asio::make_strand(_workers))
+            , _receiveStrand(boost::asio::make_strand(_workers))
         {
             UpdateAsync();
-            RunWorker();
         }
 
         virtual ~ServiceBase()
@@ -46,17 +45,9 @@ namespace NetCommon
                               });
         }
 
-        void StopWorker()
-        {
-            _ioContext.stop();
-        }
-
         void JoinWorkers()
         {
-            if (_workers.joinable())
-            {
-                _workers.join();
-            }
+            _workers.join();
         }
 
     protected:
@@ -65,6 +56,11 @@ namespace NetCommon
         virtual void OnSessionUnregistered(SessionPointer pSession) = 0;
         virtual void HandleReceivedMessage(SessionPointer pSession, Message& message) = 0;
         virtual bool OnUpdateCompleted() = 0;
+
+        void StopWorkers()
+        {
+            _workers.stop();
+        }
 
         void CreateSession(Tcp::socket&& socket)
         {
@@ -77,7 +73,7 @@ namespace NetCommon
                                                          });
                                    };
 
-            SessionPointer pSession = Session::Create(_ioContext,
+            SessionPointer pSession = Session::Create(_workers,
                                                       std::move(socket),
                                                       AssignId(),
                                                       std::move(onSessionClosed),
@@ -110,14 +106,6 @@ namespace NetCommon
         }
 
     private:
-        void RunWorker()
-        {
-            _workers = std::thread([this]()
-                                  {
-                                      _ioContext.run();
-                                  });
-        }
-
         SessionId AssignId()
         {
             static SessionId id = 10000;
@@ -230,9 +218,8 @@ namespace NetCommon
         }
 
     protected:
-        IoContext                       _ioContext;
-        WorkGuard                       _workGuard;
         ThreadPool                      _workers;
+        WorkGuard                       _workGuard;
         SessionMap                      _sessions;
         Strand                          _sessionsStrand;
 

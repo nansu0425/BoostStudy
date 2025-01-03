@@ -12,8 +12,8 @@ namespace Server
         using Message       = NetCommon::Message;
 
     public:
-        Service(uint16_t port)
-            : ServerServiceBase(port)
+        Service(size_t nWorkers, uint16_t port)
+            : ServerServiceBase(nWorkers, port)
         {}
 
     protected:

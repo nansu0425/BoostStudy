@@ -13,27 +13,27 @@ namespace NetCommon
         using Id                = uint32_t;
 
     private:
-        using IoContext         = boost::asio::io_context;
-        using Tcp               = boost::asio::ip::tcp;
-        using Strand            = boost::asio::strand<boost::asio::io_context::executor_type>;
+        using ThreadPool        = boost::asio::thread_pool;
+        using Strand            = boost::asio::strand<ThreadPool::executor_type>;
         using ErrorCode         = boost::system::error_code;
+        using Tcp               = boost::asio::ip::tcp;
         using Endpoints         = boost::asio::ip::basic_resolver_results<Tcp>;
         using CloseCallback     = std::function<void(Pointer)>;
 
     public:
-        static Pointer Create(boost::asio::io_context& ioContext,
+        static Pointer Create(ThreadPool& workers,
                               Tcp::socket&& socket,
                               Id id,
                               CloseCallback onSessionClosed,
                               std::queue<OwnedMessage>& receiveBuffer,
-                              Strand& receiveBufferStrand)
+                              Strand& receiveStrand)
         {
-            return Pointer(new Session(ioContext, 
+            return Pointer(new Session(workers, 
                                        std::move(socket),
                                        id,
                                        onSessionClosed,
                                        receiveBuffer, 
-                                       receiveBufferStrand));
+                                       receiveStrand));
         }
 
         ~Session()
@@ -82,21 +82,21 @@ namespace NetCommon
         }
 
     private:
-        Session(boost::asio::io_context& ioContext,
+        Session(ThreadPool& workers,
                 Tcp::socket&& socket,
                 Id id,
                 CloseCallback onSessionClosed,
                 std::queue<OwnedMessage>& receiveBuffer,
-                Strand& receiveBufferStrand)
-            : _ioContext(ioContext)
+                Strand& receiveStrand)
+            : _workers(workers)
             , _socket(std::move(socket))
-            , _socketStrand(boost::asio::make_strand(ioContext))
+            , _socketStrand(boost::asio::make_strand(workers))
             , _id(id)
             , _endpoint(_socket.remote_endpoint())
             , _onSessionClosed(onSessionClosed)
             , _receiveBuffer(receiveBuffer)
-            , _receiveStrand(receiveBufferStrand)
-            , _sendStrand(boost::asio::make_strand(ioContext))
+            , _receiveStrand(receiveStrand)
+            , _sendStrand(boost::asio::make_strand(workers))
             , _isWritingMessage(false)
         {}
 
@@ -338,7 +338,7 @@ namespace NetCommon
         }
 
     private:
-        IoContext&                      _ioContext;
+        ThreadPool&                     _workers;
         Tcp::socket                     _socket;
         Strand                          _socketStrand;
         const Id                        _id;
