@@ -43,7 +43,7 @@ namespace Server
             }
         }
 
-        virtual bool OnUpdateStarted() override
+        virtual bool OnUpdateCompleted() override
         {
             return true;
         }

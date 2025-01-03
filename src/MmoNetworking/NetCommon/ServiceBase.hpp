@@ -7,6 +7,8 @@ namespace NetCommon
     class ServiceBase
     {
     protected:
+        using IoContext             = boost::asio::io_context;
+        using ThreadPool            = std::thread;
         using SessionPointer        = Session::Pointer;
         using SessionId             = Session::Id;
         using SessionMap            = std::unordered_map<SessionId, SessionPointer>;
@@ -21,27 +23,12 @@ namespace NetCommon
             , _sessionsStrand(boost::asio::make_strand(_ioContext))
             , _receiveStrand(boost::asio::make_strand(_ioContext))
         {
+            UpdateAsync();
             RunWorker();
         }
 
         virtual ~ServiceBase()
-        {
-            StopWorker();
-        }
-
-        bool Update(size_t nMaxMessages = 0)
-        {
-            std::promise<bool> resultPromise;
-            std::future<bool> resultFuture = resultPromise.get_future();
-
-            boost::asio::post(_receiveStrand,
-                              [this, nMaxMessages, &resultPromise]()
-                              {
-                                  FetchReceivedMessages(resultPromise, nMaxMessages);
-                              });
-
-            return resultFuture.get();
-        }
+        {}
 
         void SendMessageAsync(SessionPointer pSession, const Message& message)
         {
@@ -59,12 +46,25 @@ namespace NetCommon
                               });
         }
 
+        void StopWorker()
+        {
+            _ioContext.stop();
+        }
+
+        void JoinWorkers()
+        {
+            if (_workers.joinable())
+            {
+                _workers.join();
+            }
+        }
+
     protected:
         virtual bool OnSessionCreated(SessionPointer pSession) = 0;
         virtual void OnSessionRegistered(SessionPointer pSession) = 0;
         virtual void OnSessionUnregistered(SessionPointer pSession) = 0;
         virtual void OnMessageReceived(SessionPointer pSession, Message& message) = 0;
-        virtual bool OnUpdateStarted() = 0;
+        virtual bool OnUpdateCompleted() = 0;
 
         void CreateSession(Tcp::socket&& socket)
         {
@@ -112,20 +112,10 @@ namespace NetCommon
     private:
         void RunWorker()
         {
-            _worker = std::thread([this]()
+            _workers = std::thread([this]()
                                   {
                                       _ioContext.run();
                                   });
-        }
-
-        void StopWorker()
-        {
-            _ioContext.stop();
-
-            if (_worker.joinable())
-            {
-                _worker.join();
-            }
         }
 
         SessionId AssignId()
@@ -188,15 +178,24 @@ namespace NetCommon
             }
         }
 
-        void FetchReceivedMessages(std::promise<bool>& updateResult, size_t nMaxMessages)
+        void UpdateAsync(size_t nMaxReceivedMessages = 0)
         {
-            if (nMaxMessages == 0)
+            boost::asio::post(_receiveStrand,
+                              [this, nMaxReceivedMessages]()
+                              {
+                                  FetchReceivedMessages(nMaxReceivedMessages);
+                              });
+        }
+
+        void FetchReceivedMessages(size_t nMaxReceivedMessages)
+        {
+            if (nMaxReceivedMessages == 0)
             {
                 _receivedMessages = std::move(_receiveBuffer);
             }
             else
             {
-                for (size_t messageCount = 0; messageCount < nMaxMessages; ++messageCount)
+                for (size_t messageCount = 0; messageCount < nMaxReceivedMessages; ++messageCount)
                 {
                     if (_receiveBuffer.empty())
                     {
@@ -208,13 +207,13 @@ namespace NetCommon
                 }
             }
 
-            boost::asio::post([this, &updateResult]()
-                               {
-                                    ProcessReceivedMessages(updateResult);
-                               });
+            boost::asio::post([this, nMaxReceivedMessages]()
+                              {
+                                   ProcessReceivedMessages(nMaxReceivedMessages);
+                              });
         }
 
-        void ProcessReceivedMessages(std::promise<bool>& updateResult)
+        void ProcessReceivedMessages(size_t nMaxReceivedMessages)
         {
             while (!_receivedMessages.empty())
             {
@@ -224,13 +223,16 @@ namespace NetCommon
                 OnMessageReceived(receiveMessage.pOwner, receiveMessage.message);
             }
 
-            updateResult.set_value(OnUpdateStarted());
+            if (OnUpdateCompleted())
+            {
+                UpdateAsync(nMaxReceivedMessages);
+            }
         }
 
     protected:
-        boost::asio::io_context         _ioContext;
+        IoContext                       _ioContext;
         WorkGuard                       _workGuard;
-        std::thread                     _worker;
+        ThreadPool                      _workers;
         SessionMap                      _sessions;
         Strand                          _sessionsStrand;
 

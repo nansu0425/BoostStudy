@@ -7,9 +7,8 @@ int main()
     {
         Client::Service service;
         service.Start("127.0.0.1", "60000");
-
-        while (service.Update())
-        {}
+        
+        service.JoinWorkers();
     }
     catch (const std::exception& e)
     {
