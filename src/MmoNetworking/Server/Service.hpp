@@ -26,10 +26,8 @@ namespace Server
         virtual void OnSessionRegistered(SessionPointer pSession) override
         {}
 
-        virtual void OnSessionDisconnected(SessionPointer pSession) override
-        {
-            std::cout << "[" << pSession->GetId() << "] Session disconnected\n";
-        }
+        virtual void OnSessionUnregistered(SessionPointer pSession) override
+        {}
 
         virtual void OnMessageReceived(SessionPointer pSession, Message& message) override
         {

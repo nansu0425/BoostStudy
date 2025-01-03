@@ -8,31 +8,37 @@ namespace NetCommon
     class Session 
         : public std::enable_shared_from_this<Session>
     {
+    public:
+        using Pointer           = std::shared_ptr<Session>;
+        using Id                = uint32_t;
+
     private:
         using IoContext         = boost::asio::io_context;
         using Tcp               = boost::asio::ip::tcp;
         using Strand            = boost::asio::strand<boost::asio::io_context::executor_type>;
         using ErrorCode         = boost::system::error_code;
         using Endpoints         = boost::asio::ip::basic_resolver_results<Tcp>;
+        using CloseCallback     = std::function<void(Pointer)>;
 
     public:
-        using Pointer           = std::shared_ptr<Session>;
-        using Id                = uint32_t;
-
-    public:
-        static Pointer Create(Id id,
-                              boost::asio::io_context& ioContext,
+        static Pointer Create(boost::asio::io_context& ioContext,
                               Tcp::socket&& socket,
-                              std::function<void(Pointer)> onSessionClosed,
+                              Id id,
+                              CloseCallback onSessionClosed,
                               std::queue<OwnedMessage>& receiveBuffer,
                               Strand& receiveBufferStrand)
         {
-            return Pointer(new Session(id, 
-                                       ioContext, 
+            return Pointer(new Session(ioContext, 
                                        std::move(socket),
+                                       id,
                                        onSessionClosed,
                                        receiveBuffer, 
                                        receiveBufferStrand));
+        }
+
+        ~Session()
+        {
+            std::cout << "[" << _id << "] Session destroyed: " << _endpoint << "\n";
         }
 
         void ReceiveMessageAsync()
@@ -76,18 +82,18 @@ namespace NetCommon
         }
 
     private:
-        Session(Id id,
-                boost::asio::io_context& ioContext,
+        Session(boost::asio::io_context& ioContext,
                 Tcp::socket&& socket,
-                std::function<void(Pointer)> onSessionClosed,
+                Id id,
+                CloseCallback onSessionClosed,
                 std::queue<OwnedMessage>& receiveBuffer,
                 Strand& receiveBufferStrand)
-            : _id(id)
-            , _ioContext(ioContext)
+            : _ioContext(ioContext)
             , _socket(std::move(socket))
             , _socketStrand(boost::asio::make_strand(ioContext))
+            , _id(id)
             , _endpoint(_socket.remote_endpoint())
-            , _onSessionClose(onSessionClosed)
+            , _onSessionClosed(onSessionClosed)
             , _receiveBuffer(receiveBuffer)
             , _receiveStrand(receiveBufferStrand)
             , _sendStrand(boost::asio::make_strand(ioContext))
@@ -99,7 +105,7 @@ namespace NetCommon
             if (_socket.is_open())
             {
                 _socket.close();
-                _onSessionClose(shared_from_this());
+                _onSessionClosed(shared_from_this());
             }
         }
 
@@ -332,14 +338,14 @@ namespace NetCommon
         }
 
     private:
-        const Id                        _id;
         IoContext&                      _ioContext;
         Tcp::socket                     _socket;
         Strand                          _socketStrand;
+        const Id                        _id;
         const Tcp::endpoint             _endpoint;
 
-        // Close
-        std::function<void(Pointer)>    _onSessionClose;
+        // Unregister-Destroy
+        CloseCallback                   _onSessionClosed;
 
         // Receive
         std::queue<OwnedMessage>&       _receiveBuffer;

@@ -62,7 +62,7 @@ namespace NetCommon
     protected:
         virtual bool OnSessionCreated(SessionPointer pSession) = 0;
         virtual void OnSessionRegistered(SessionPointer pSession) = 0;
-        virtual void OnSessionDisconnected(SessionPointer pSession) = 0;
+        virtual void OnSessionUnregistered(SessionPointer pSession) = 0;
         virtual void OnMessageReceived(SessionPointer pSession, Message& message) = 0;
         virtual bool OnUpdateStarted() = 0;
 
@@ -77,13 +77,13 @@ namespace NetCommon
                                                          });
                                    };
 
-            SessionPointer pSession = Session::Create(AssignId(),
-                                                      _ioContext,
+            SessionPointer pSession = Session::Create(_ioContext,
                                                       std::move(socket),
+                                                      AssignId(),
                                                       std::move(onSessionClosed),
                                                       _receiveBuffer,
                                                       _receiveStrand);
-            std::cout << "[" << pSession->GetEndpoint() << "] Session created\n";
+            std::cout << pSession << " Session created: " << pSession->GetEndpoint() << "\n";
 
             if (OnSessionCreated(pSession))
             {
@@ -95,17 +95,17 @@ namespace NetCommon
             }
         }
 
-        void DisconnectSessionAsync(SessionPointer pSession)
+        void DestroySessionAsync(SessionPointer pSession)
         {
             pSession->CloseAsync();
         }
 
-        void DisconnectAllSessionsAsync()
+        void DestroyAllSessionsAsync()
         {
             boost::asio::post(_sessionsStrand,
                               [this]()
                               {
-                                  DisconnectAllSessions();
+                                  DestroyAllSessions();
                               });
         }
 
@@ -137,7 +137,7 @@ namespace NetCommon
             return assignedId;
         }
 
-        void DisconnectAllSessions()
+        void DestroyAllSessions()
         {
             for (auto& pair : _sessions)
             {
@@ -151,7 +151,9 @@ namespace NetCommon
             assert(_sessions.count(pSession->GetId()) == 1);
 
             _sessions.erase(pSession->GetId());
-            OnSessionDisconnected(pSession);
+            std::cout << pSession << " Session unregistered\n";
+
+            OnSessionUnregistered(pSession);
         }
 
         void RegisterSessionAsync(SessionPointer pSession)
@@ -168,9 +170,9 @@ namespace NetCommon
             _sessions[pSession->GetId()] = pSession;
             std::cout << _sessions[pSession->GetId()] << " Session registered\n";
 
-            pSession->ReceiveMessageAsync();
-
             OnSessionRegistered(pSession);
+
+            pSession->ReceiveMessageAsync();
         }
 
         void BroadcastMessage(const Message& message, SessionPointer pIgnoredSession)
