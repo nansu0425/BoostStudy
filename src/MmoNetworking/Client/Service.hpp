@@ -13,16 +13,13 @@ namespace Client
         using TimePoint     = std::chrono::system_clock::time_point;
 
     protected:
-        virtual bool OnSessionConnected(SessionPointer pSession) override
+        virtual bool OnSessionCreated(SessionPointer pSession) override
         {
-            std::cout << "[" << pSession->GetId() << "] Session connected\n";
             return true;
         }
 
         virtual void OnSessionRegistered(SessionPointer pSession) override
         {
-            std::cout << "[" << pSession->GetId() << "] Session registered\n";
-
             Ping(pSession);
         }
 
@@ -67,8 +64,8 @@ namespace Client
             TimePoint end;
             message >> end;
 
-            auto elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(end - _start);;
-            std::cout << "[" << pSession->GetId() << "] Ping " << elapsed.count() << "ns \n";
+            auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(end - _start);;
+            std::cout << "[" << pSession->GetId() << "] Ping " << elapsed.count() << "us \n";
 
             std::this_thread::sleep_for(std::chrono::seconds(1));
             Ping(pSession);

@@ -60,13 +60,13 @@ namespace NetCommon
         }
 
     protected:
-        virtual bool OnSessionConnected(SessionPointer pSession) = 0;
+        virtual bool OnSessionCreated(SessionPointer pSession) = 0;
         virtual void OnSessionRegistered(SessionPointer pSession) = 0;
         virtual void OnSessionDisconnected(SessionPointer pSession) = 0;
         virtual void OnMessageReceived(SessionPointer pSession, Message& message) = 0;
         virtual bool OnUpdateStarted() = 0;
 
-        SessionPointer CreateSession(Tcp::socket&& socket)
+        void CreateSession(Tcp::socket&& socket)
         {
             auto onSessionClosed = [this](SessionPointer pSession)
                                    {
@@ -83,26 +83,16 @@ namespace NetCommon
                                                       std::move(onSessionClosed),
                                                       _receiveBuffer,
                                                       _receiveStrand);
+            std::cout << "[" << pSession->GetEndpoint() << "] Session created\n";
 
-            return pSession;
-        }
-
-        SessionId AssignId()
-        {
-            static SessionId id = 10000;
-            SessionId assignedId = id;
-            ++id;
-
-            return assignedId;
-        }
-
-        void RegisterSessionAsync(SessionPointer pSession) 
-        {
-            boost::asio::post(_sessionsStrand, 
-                              [this, pSession]()
-                              {
-                                  RegisterSession(pSession);
-                              });
+            if (OnSessionCreated(pSession))
+            {
+                RegisterSessionAsync(pSession);
+            }
+            else
+            {
+                std::cout << "[" << pSession->GetEndpoint() << "] Session denied\n";
+            }
         }
 
         void DisconnectSessionAsync(SessionPointer pSession)
@@ -138,6 +128,15 @@ namespace NetCommon
             }
         }
 
+        SessionId AssignId()
+        {
+            static SessionId id = 10000;
+            SessionId assignedId = id;
+            ++id;
+
+            return assignedId;
+        }
+
         void DisconnectAllSessions()
         {
             for (auto& pair : _sessions)
@@ -155,9 +154,20 @@ namespace NetCommon
             OnSessionDisconnected(pSession);
         }
 
+        void RegisterSessionAsync(SessionPointer pSession)
+        {
+            boost::asio::post(_sessionsStrand,
+                              [this, pSession]()
+                              {
+                                  RegisterSession(pSession);
+                              });
+        }
+
         void RegisterSession(SessionPointer pSession)
         {
             _sessions[pSession->GetId()] = pSession;
+            std::cout << _sessions[pSession->GetId()] << " Session registered\n";
+
             pSession->ReceiveMessageAsync();
 
             OnSessionRegistered(pSession);

@@ -10,50 +10,61 @@ namespace NetCommon
         using Endpoints             = boost::asio::ip::basic_resolver_results<Tcp>;
 
     public:
+        ClientServiceBase()
+            : ServiceBase()
+            , _socket(_ioContext)
+            , _resolver(_ioContext)
+        {}
+
         void Start(std::string_view host, std::string_view service)
-        {
-            try
-            {
-                Tcp::resolver resolver(_ioContext);
-                Endpoints endpoints = resolver.resolve(host, service);
-
-                Connect(endpoints);
-            }
-            catch (const std::exception&)
-            {
-                std::cerr << "[CLIENT] Failed to start\n";
-                throw;
-            }
-
+        {   
+            ConnectAsync(host, service);
             std::cout << "[CLIENT] Started!\n";
         }
 
     private:
-        void Connect(Endpoints endpoints)
+        void ConnectAsync(std::string_view host, std::string_view service)
         {
-            try
-            {
-                Tcp::socket socket(_ioContext);
-                boost::asio::connect(socket, endpoints);
-
-                SessionPointer pSession = CreateSession(std::move(socket));
-                std::cout << "[CLIENT] New session: " << pSession->GetEndpoint() << "\n";
-
-                if (OnSessionConnected(pSession))
-                {
-                    RegisterSessionAsync(pSession);
-                }
-                else
-                {
-                    std::cout << "[-----] Session denied\n";
-                }
-            }
-            catch (const std::exception&)
-            {
-                std::cerr << "[CLIENT] Failed to connect\n";
-                throw;
-            }
+            _resolver.async_resolve(host,
+                                    service,
+                                    [this](const ErrorCode& error,
+                                           Endpoints endpoints)
+                                    {
+                                        OnResolveCompleted(error, endpoints);
+                                    });
         }
+
+        void OnResolveCompleted(const ErrorCode& error, Endpoints endpoints)
+        {
+            if (error)
+            {
+                std::cerr << "[CLIENT] Failed to resolve: " << error << "\n";
+                return;
+            }
+
+            boost::asio::async_connect(_socket,
+                                       endpoints,
+                                       [this](const ErrorCode& error,
+                                              const Tcp::endpoint& endpoint)
+                                       {
+                                           OnConnectCompleted(error);
+                                       });
+        }
+
+        void OnConnectCompleted(const ErrorCode& error)
+        {
+            if (error)
+            {
+                std::cerr << "[CLIENT] Failed to connect: " << error << "\n";
+                return;
+            }
+
+            CreateSession(std::move(_socket));
+        }
+
+    private:
+        Tcp::socket         _socket;
+        Tcp::resolver       _resolver;
 
     };
 }

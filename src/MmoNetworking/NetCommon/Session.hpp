@@ -68,6 +68,13 @@ namespace NetCommon
             return _endpoint;
         }
 
+        friend std::ostream& operator<<(std::ostream& os, Pointer pSession)
+        {
+            os << "[" << pSession->GetId() << "]";
+
+            return os;
+        }
+
     private:
         Session(Id id,
                 boost::asio::io_context& ioContext,
