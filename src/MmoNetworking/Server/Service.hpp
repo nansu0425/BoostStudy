@@ -19,17 +19,6 @@ namespace Server
         {}
 
     protected:
-        virtual bool OnSessionCreated(SessionPointer pSession) override
-        {
-            return true;
-        }
-
-        virtual void OnSessionRegistered(SessionPointer pSession) override
-        {}
-
-        virtual void OnSessionUnregistered(SessionPointer pSession) override
-        {}
-
         virtual void HandleReceivedMessage(SessionPointer pSession, Message& message) override
         {
             Client::MessageId messageId = static_cast<Client::MessageId>(message.header.id);
@@ -42,11 +31,6 @@ namespace Server
             default:
                 break;
             }
-        }
-
-        virtual bool OnReceivedMessagesDispatched() override
-        {
-            return true;
         }
 
         virtual void OnTickRateMeasured(const TickRate measured) override

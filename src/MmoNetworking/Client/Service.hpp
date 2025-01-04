@@ -20,18 +20,10 @@ namespace Client
         {}
 
     protected:
-        virtual bool OnSessionCreated(SessionPointer pSession) override
-        {
-            return true;
-        }
-
         virtual void OnSessionRegistered(SessionPointer pSession) override
         {
             PingAsync(pSession);
         }
-
-        virtual void OnSessionUnregistered(SessionPointer pSession) override
-        {}
 
         virtual void HandleReceivedMessage(SessionPointer pSession, Message& message) override
         {
@@ -45,11 +37,6 @@ namespace Client
             default:
                 break;
             }
-        }
-
-        virtual bool OnReceivedMessagesDispatched() override
-        {
-            return true;
         }
 
     private:

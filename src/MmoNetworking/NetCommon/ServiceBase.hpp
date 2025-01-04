@@ -36,20 +36,9 @@ namespace NetCommon
         virtual ~ServiceBase()
         {}
 
-        void SendMessageAsync(SessionPointer pSession, const Message& message)
+        void StopWorkers()
         {
-            assert(pSession != nullptr);
-
-            pSession->SendMessageAsync(message);
-        }
-
-        void BroadcastMessageAsync(const Message& message, SessionPointer pIgnoredSession = nullptr)
-        {
-            boost::asio::post(_sessionsStrand,
-                              [this, &message, pIgnoredSession]()
-                              {
-                                  BroadcastMessage(message, pIgnoredSession);
-                              });
+            _workers.stop();
         }
 
         void JoinWorkers()
@@ -58,16 +47,12 @@ namespace NetCommon
         }
 
     protected:
-        virtual bool OnSessionCreated(SessionPointer pSession) = 0;
-        virtual void OnSessionRegistered(SessionPointer pSession) = 0;
-        virtual void OnSessionUnregistered(SessionPointer pSession) = 0;
-        virtual void HandleReceivedMessage(SessionPointer pSession, Message& message) = 0;
-        virtual bool OnReceivedMessagesDispatched() = 0;
-
-        void StopWorkers()
-        {
-            _workers.stop();
-        }
+        virtual bool OnSessionCreated(SessionPointer pSession) { return true; }
+        virtual void OnSessionRegistered(SessionPointer pSession) {}
+        virtual void OnSessionUnregistered(SessionPointer pSession) {}
+        virtual void HandleReceivedMessage(SessionPointer pSession, Message& message) {}
+        virtual bool OnReceivedMessagesDispatched() { return true; }
+        virtual void OnTickRateMeasured(const TickRate measured) {}
 
         void CreateSession(Tcp::socket&& socket)
         {
@@ -94,7 +79,7 @@ namespace NetCommon
             }
             else
             {
-                std::cout << "[" << pSession->GetEndpoint() << "] Session denied\n";
+                std::cout << pSession << " Session denied: " << pSession->GetEndpoint() << "\n";
             }
         }
 
@@ -108,12 +93,37 @@ namespace NetCommon
             boost::asio::post(_sessionsStrand,
                               [this]()
                               {
-                                  DestroyAllSessions();
+                                  for (auto& pair : _sessions)
+                                  {
+                                      SessionPointer pSession = pair.second;
+                                      pSession->CloseAsync();
+                                  }
                               });
         }
 
-        virtual void OnTickRateMeasured(const TickRate measured)
-        {}
+        void SendMessageAsync(SessionPointer pSession, const Message& message)
+        {
+            assert(pSession != nullptr);
+
+            pSession->SendMessageAsync(message);
+        }
+
+        void BroadcastMessageAsync(const Message& message, SessionPointer pIgnoredSession = nullptr)
+        {
+            boost::asio::post(_sessionsStrand,
+                              [this, &message, pIgnoredSession]()
+                              {
+                                  for (auto& pair : _sessions)
+                                  {
+                                      SessionPointer pSession = pair.second;
+
+                                      if (pSession != pIgnoredSession)
+                                      {
+                                          pSession->SendMessageAsync(message);
+                                      }
+                                  }
+                              });
+        }
 
     private:
         SessionId AssignId()
@@ -123,25 +133,6 @@ namespace NetCommon
             ++id;
 
             return assignedId;
-        }
-
-        void DestroyAllSessions()
-        {
-            for (auto& pair : _sessions)
-            {
-                SessionPointer pSession = pair.second;
-                pSession->CloseAsync();
-            }
-        }
-
-        void UnregisterSession(SessionPointer pSession)
-        {
-            assert(_sessions.count(pSession->GetId()) == 1);
-
-            _sessions.erase(pSession->GetId());
-            std::cout << pSession << " Session unregistered\n";
-
-            OnSessionUnregistered(pSession);
         }
 
         void RegisterSessionAsync(SessionPointer pSession)
@@ -163,17 +154,14 @@ namespace NetCommon
             pSession->ReceiveMessageAsync();
         }
 
-        void BroadcastMessage(const Message& message, SessionPointer pIgnoredSession)
+        void UnregisterSession(SessionPointer pSession)
         {
-            for (auto& pair : _sessions)
-            {
-                SessionPointer pSession = pair.second;
+            assert(_sessions.count(pSession->GetId()) == 1);
 
-                if (pSession != pIgnoredSession)
-                {
-                    pSession->SendMessageAsync(message);
-                }
-            }
+            _sessions.erase(pSession->GetId());
+            std::cout << pSession << " Session unregistered\n";
+
+            OnSessionUnregistered(pSession);
         }
 
         void UpdateAsync()
