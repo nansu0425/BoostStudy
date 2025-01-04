@@ -10,8 +10,9 @@ namespace NetCommon
         using Endpoints         = boost::asio::ip::basic_resolver_results<Tcp>;
 
     public:
-        ClientServiceBase(size_t nWorkers)
-            : ServiceBase(nWorkers)
+        ClientServiceBase(size_t nWorkers, 
+                          TickRate maxTickRate)
+            : ServiceBase(nWorkers, maxTickRate)
             , _socket(_workers)
             , _resolver(_workers)
         {}

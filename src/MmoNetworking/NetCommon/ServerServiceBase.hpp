@@ -7,8 +7,10 @@ namespace NetCommon
     class ServerServiceBase : public ServiceBase
     {
     public:
-        ServerServiceBase(size_t nWorkers, uint16_t port)
-            : ServiceBase(nWorkers)
+        ServerServiceBase(size_t nWorkers, 
+                          TickRate maxTickRate, 
+                          uint16_t port)
+            : ServiceBase(nWorkers, maxTickRate)
             , _acceptor(_workers, Tcp::endpoint(Tcp::v4(), port))
         {}
 

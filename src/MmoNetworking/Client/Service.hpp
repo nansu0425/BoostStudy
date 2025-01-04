@@ -11,12 +11,12 @@ namespace Client
     private:
         using Message       = NetCommon::Message;
         using TimePoint     = std::chrono::steady_clock::time_point;
-        using Timer         = boost::asio::steady_timer;
 
     public:
-        Service(size_t nWorkers)
-            : ClientServiceBase(nWorkers)
-            , _timer(_workers)
+        Service(size_t nWorkers, 
+                TickRate maxTickRate)
+            : ClientServiceBase(nWorkers, maxTickRate)
+            , _pingTimer(_workers)
         {}
 
     protected:
@@ -47,7 +47,7 @@ namespace Client
             }
         }
 
-        virtual bool OnUpdateCompleted() override
+        virtual bool OnReceivedMessagesDispatched() override
         {
             return true;
         }
@@ -70,16 +70,16 @@ namespace Client
             auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(end - _start);;
             std::cout << pSession << " Ping: " << elapsed.count() << "us \n";
 
-            _timer.expires_after(std::chrono::seconds(1));
-            _timer.async_wait([this, pSession](const ErrorCode& error)
-                              {
-                                  PingAsync(pSession);
-                              });
+            _pingTimer.expires_after(std::chrono::seconds(1));
+            _pingTimer.async_wait([this, pSession](const ErrorCode& error)
+                                  {
+                                      PingAsync(pSession);
+                                  });
         }
 
     private:
         TimePoint       _start;
-        Timer           _timer;
+        Timer           _pingTimer;
     
     };
 }

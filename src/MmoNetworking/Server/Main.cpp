@@ -5,7 +5,7 @@ int main()
 {
     try
     {
-        Server::Service service(4, 60000);
+        Server::Service service(std::thread::hardware_concurrency(), 60, 60000);
         service.Start();
 
         service.JoinWorkers();
