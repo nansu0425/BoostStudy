@@ -12,10 +12,10 @@ namespace Server
         using Message       = NetCommon::Message;
 
     public:
-        Service(size_t nWorkers, 
-                TickRate maxTickRate, 
+        Service(size_t nWorkers,
+                size_t nMaxReceivedMessages,
                 uint16_t port)
-            : ServerServiceBase(nWorkers, maxTickRate, port)
+            : ServerServiceBase(nWorkers, nMaxReceivedMessages, port)
         {}
 
     protected:
@@ -49,9 +49,9 @@ namespace Server
             return true;
         }
 
-        virtual void OnTickRateMeasured(const TickRate measuredTickRate) override
+        virtual void OnTickRateMeasured(const TickRate measured) override
         {
-            std::cout << "[SERVER] Tick rate: " << measuredTickRate << "hz\n";
+            std::cout << "[SERVER] Tick rate: " << measured << "hz\n";
         }
 
     private:

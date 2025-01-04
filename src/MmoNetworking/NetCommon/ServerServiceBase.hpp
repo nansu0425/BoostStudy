@@ -8,9 +8,9 @@ namespace NetCommon
     {
     public:
         ServerServiceBase(size_t nWorkers, 
-                          TickRate maxTickRate, 
+                          size_t nMaxReceivedMessages,
                           uint16_t port)
-            : ServiceBase(nWorkers, maxTickRate)
+            : ServiceBase(nWorkers, nMaxReceivedMessages)
             , _acceptor(_workers, Tcp::endpoint(Tcp::v4(), port))
         {}
 

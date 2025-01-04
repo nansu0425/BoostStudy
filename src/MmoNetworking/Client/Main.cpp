@@ -5,7 +5,7 @@ int main()
 {
     try
     {
-        Client::Service service(1, 60);
+        Client::Service service(1, 0);
         service.Start("127.0.0.1", "60000");
         
         service.JoinWorkers();

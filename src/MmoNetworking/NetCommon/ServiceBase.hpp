@@ -12,8 +12,7 @@ namespace NetCommon
         using Strand                = boost::asio::strand<ThreadPool::executor_type>;
         using Timer                 = boost::asio::steady_timer;
         using Seconds               = std::chrono::seconds;
-        using Microseconds          = std::chrono::microseconds;
-        using TickRate              = uint16_t;
+        using TickRate              = uint32_t;
         using ErrorCode             = boost::system::error_code;
         using Tcp                   = boost::asio::ip::tcp;
         using SessionPointer        = Session::Pointer;
@@ -21,16 +20,14 @@ namespace NetCommon
         using SessionMap            = std::unordered_map<SessionId, SessionPointer>;
 
     public:
-        ServiceBase(size_t nWorkers, 
-                    TickRate maxTickRate)
+        ServiceBase(size_t nWorkers, size_t nMaxReceivedMessages)
             : _workers(nWorkers)
             , _workGuard(boost::asio::make_work_guard(_workers))
             , _sessionsStrand(boost::asio::make_strand(_workers))
-            , _tickTimer(_workers)
-            , _tickExpiryTime(1'000'000 / maxTickRate)
             , _tickRateTimer(_workers)
             , _tickRate(0)
             , _receiveStrand(boost::asio::make_strand(_workers))
+            , _nMaxReceivedMessages(nMaxReceivedMessages)
         {
             UpdateAsync();
             WaitTickRateTimerAsync();
@@ -115,7 +112,7 @@ namespace NetCommon
                               });
         }
 
-        virtual void OnTickRateMeasured(const TickRate measuredTickRate)
+        virtual void OnTickRateMeasured(const TickRate measured)
         {}
 
     private:
@@ -179,26 +176,24 @@ namespace NetCommon
             }
         }
 
-        void UpdateAsync(size_t nMaxReceivedMessages = 0)
+        void UpdateAsync()
         {
-            _tickTimer.expires_after(_tickExpiryTime);
-
             boost::asio::post(_receiveStrand,
-                              [this, nMaxReceivedMessages]()
+                              [this]()
                               {
-                                  FetchReceivedMessages(nMaxReceivedMessages);
+                                  FetchReceivedMessages();
                               });
         }
 
-        void FetchReceivedMessages(size_t nMaxReceivedMessages)
+        void FetchReceivedMessages()
         {
-            if (nMaxReceivedMessages == 0)
+            if (_nMaxReceivedMessages == 0)
             {
                 _receivedMessages = std::move(_receiveBuffer);
             }
             else
             {
-                for (size_t messageCount = 0; messageCount < nMaxReceivedMessages; ++messageCount)
+                for (size_t messageCount = 0; messageCount < _nMaxReceivedMessages; ++messageCount)
                 {
                     if (_receiveBuffer.empty())
                     {
@@ -210,13 +205,13 @@ namespace NetCommon
                 }
             }
 
-            boost::asio::post([this, nMaxReceivedMessages]()
+            boost::asio::post([this]()
                               {
-                                   DispatchReceivedMessages(nMaxReceivedMessages);
+                                   DispatchReceivedMessages();
                               });
         }
 
-        void DispatchReceivedMessages(size_t nMaxReceivedMessages)
+        void DispatchReceivedMessages()
         {
             while (!_receivedMessages.empty())
             {
@@ -227,31 +222,17 @@ namespace NetCommon
             }
 
             const bool shouldUpdate = OnReceivedMessagesDispatched();
-            OnUpdateCompleted(nMaxReceivedMessages, shouldUpdate);
+            OnUpdateCompleted(shouldUpdate);
         }
 
-        void OnUpdateCompleted(size_t nMaxReceivedMessages, const bool shouldUpdate)
+        void OnUpdateCompleted(const bool shouldUpdate)
         {
             _tickRate.fetch_add(1);
 
             if (shouldUpdate)
             {
-                _tickTimer.async_wait([this, nMaxReceivedMessages](const ErrorCode& error)
-                                      {
-                                          OnTickTimerExpired(nMaxReceivedMessages, error);
-                                      });
+                UpdateAsync();
             }
-        }
-
-        void OnTickTimerExpired(size_t nMaxReceivedMessages, const ErrorCode& error)
-        {
-            if (error)
-            {
-                std::cerr << "[Tick timer] Failed to wait: " << error << "\n";
-                return;
-            }
-            
-            UpdateAsync(nMaxReceivedMessages);
         }
 
         void WaitTickRateTimerAsync()
@@ -267,12 +248,14 @@ namespace NetCommon
         {
             if (error)
             {
-                std::cerr << "[Tick rate timer] Failed to wait: " << error << "\n";
+                std::cerr << "[TICK_RATE_TIMER] Failed to wait: " << error << "\n";
                 return;
             }
 
             WaitTickRateTimerAsync();
-            OnTickRateMeasured(_tickRate.exchange(0));
+
+            const TickRate measured = _tickRate.exchange(0);
+            OnTickRateMeasured(measured);
         }
 
     protected:
@@ -282,8 +265,6 @@ namespace NetCommon
         Strand                          _sessionsStrand;
 
         // Update
-        Timer                           _tickTimer;
-        const Microseconds              _tickExpiryTime;
         Timer                           _tickRateTimer;
         std::atomic<TickRate>           _tickRate;
 
@@ -291,6 +272,7 @@ namespace NetCommon
         std::queue<OwnedMessage>        _receiveBuffer;
         Strand                          _receiveStrand;
         std::queue<OwnedMessage>        _receivedMessages;
+        const size_t                    _nMaxReceivedMessages;
 
     };
 }

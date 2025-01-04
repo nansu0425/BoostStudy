@@ -11,8 +11,8 @@ namespace NetCommon
 
     public:
         ClientServiceBase(size_t nWorkers, 
-                          TickRate maxTickRate)
-            : ServiceBase(nWorkers, maxTickRate)
+                          size_t nMaxReceivedMessages)
+            : ServiceBase(nWorkers, nMaxReceivedMessages)
             , _socket(_workers)
             , _resolver(_workers)
         {}

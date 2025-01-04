@@ -14,8 +14,8 @@ namespace Client
 
     public:
         Service(size_t nWorkers, 
-                TickRate maxTickRate)
-            : ClientServiceBase(nWorkers, maxTickRate)
+                size_t nMaxReceivedMessages)
+            : ClientServiceBase(nWorkers, nMaxReceivedMessages)
             , _pingTimer(_workers)
         {}
 
