@@ -21,6 +21,11 @@ namespace NetCommon
         using CloseCallback     = std::function<void(Pointer)>;
 
     public:
+        ~Session()
+        {
+            std::cout << "[" << _id << "] Session destroyed: " << _endpoint << "\n";
+        }
+
         static Pointer Create(ThreadPool& workers,
                               Tcp::socket&& socket,
                               Id id,
@@ -28,22 +33,21 @@ namespace NetCommon
                               std::queue<OwnedMessage>& receiveBuffer,
                               Strand& receiveStrand)
         {
-            return Pointer(new Session(workers, 
+            return Pointer(new Session(workers,
                                        std::move(socket),
                                        id,
                                        onSessionClosed,
-                                       receiveBuffer, 
+                                       receiveBuffer,
                                        receiveStrand));
         }
 
-        ~Session()
+        void CloseAsync()
         {
-            std::cout << "[" << _id << "] Session destroyed: " << _endpoint << "\n";
-        }
-
-        void ReceiveMessageAsync()
-        {
-            ReadMessageAsync();
+            boost::asio::post(_socketStrand,
+                              [pSelf = shared_from_this()]()
+                              {
+                                  pSelf->Close();
+                              });
         }
 
         void SendMessageAsync(const Message& message)
@@ -55,13 +59,9 @@ namespace NetCommon
                               });
         }
 
-        void CloseAsync()
+        void ReceiveMessageAsync()
         {
-            boost::asio::post(_socketStrand,
-                              [pSelf = shared_from_this()]()
-                              {
-                                  pSelf->Close();
-                              });
+            ReadMessageAsync();
         }
 
         Id GetId() const
@@ -109,6 +109,118 @@ namespace NetCommon
             }
         }
 
+        void PushMessageToSendBuffer(const Message& message)
+        {
+            _sendBuffer.push(message);
+
+            WriteMessageAsync();
+        }
+
+        void WriteMessageAsync()
+        {
+            if (_isWritingMessage ||
+                _sendBuffer.empty())
+            {
+                return;
+            }
+
+            _writeMessage = std::move(_sendBuffer.front());
+            _sendBuffer.pop();
+
+            boost::asio::post(_socketStrand,
+                              [pSelf = shared_from_this()]()
+                              {
+                                  pSelf->WriteHeaderAsync();
+                              });
+
+            _isWritingMessage = true;
+        }
+
+        void WriteHeaderAsync()
+        {
+            boost::asio::async_write(_socket,
+                                     boost::asio::buffer(&_writeMessage.header,
+                                                         sizeof(MessageHeader)),
+                                     [pSelf = shared_from_this()](const ErrorCode& error,
+                                                                  const size_t nBytesTransferred)
+                                     {
+                                         pSelf->OnWriteHeaderCompleted(error, nBytesTransferred);
+                                     });
+        }
+
+        void OnWriteHeaderCompleted(const ErrorCode& error, const size_t nBytesTransferred)
+        {
+            if (error)
+            {
+                std::cerr << "[" << _id << "] Failed to write header: " << error << "\n";
+            }
+            else
+            {
+                assert(sizeof(MessageHeader) == nBytesTransferred);
+
+                // The size of payload is bigger than 0
+                if (_writeMessage.header.size > sizeof(MessageHeader))
+                {
+                    boost::asio::post(_socketStrand,
+                                      [pSelf = shared_from_this()]()
+                                      {
+                                          pSelf->WritePayloadAsync();
+                                      });
+
+                    return;
+                }
+            }
+
+            boost::asio::post(_sendStrand,
+                              [pSelf = shared_from_this(), error]
+                              {
+                                  pSelf->OnWriteMessageCompleted(error);
+                              });
+        }
+
+        void WritePayloadAsync()
+        {
+            boost::asio::async_write(_socket,
+                                     boost::asio::buffer(_writeMessage.payload.data(),
+                                                         _writeMessage.payload.size()),
+                                     [pSelf = shared_from_this()](const ErrorCode& error,
+                                                                  const size_t nBytesTransferred)
+                                     {
+                                         pSelf->OnWritePayloadCompleted(error, nBytesTransferred);
+                                     });
+        }
+
+        void OnWritePayloadCompleted(const ErrorCode& error, const size_t nBytesTransferred)
+        {
+            if (error)
+            {
+                std::cerr << "[" << _id << "] Failed to write payload: " << error << "\n";
+            }
+            else
+            {
+                assert(nBytesTransferred == _writeMessage.payload.size());
+            }
+
+            boost::asio::post(_sendStrand,
+                              [pSelf = shared_from_this(), error]
+                              {
+                                  pSelf->OnWriteMessageCompleted(error);
+                              });
+        }
+
+        void OnWriteMessageCompleted(const ErrorCode& error)
+        {
+            _isWritingMessage = false;
+
+            if (error)
+            {
+                CloseAsync();
+                return;
+            }
+
+            WriteMessageAsync();
+        }
+
         void ReadMessageAsync()
         {
             boost::asio::post(_socketStrand,
@@ -116,22 +228,6 @@ namespace NetCommon
                               {
                                   pSelf->ReadHeaderAsync();
                               });
-        }
-
-        void OnReadMessageCompleted(const ErrorCode& error)
-        {
-            if (!error)
-            {
-                boost::asio::post(_receiveStrand,
-                                  [pSelf = shared_from_this()]
-                                  {
-                                      pSelf->PushMessageToReceiveBuffer();
-                                  });
-            }
-            else
-            {
-                CloseAsync();
-            }
         }
 
         void ReadHeaderAsync()
@@ -148,7 +244,11 @@ namespace NetCommon
 
         void OnReadHeaderCompleted(const ErrorCode& error, const size_t nBytesTransferred)
         {
-            if (!error)
+            if (error)
+            {
+                std::cerr << "[" << _id << "] Failed to read header: " << error << "\n";
+            }
+            else
             {
                 assert(nBytesTransferred == sizeof(MessageHeader));
                 assert(_readMessage.header.size >= sizeof(MessageHeader));
@@ -166,10 +266,6 @@ namespace NetCommon
 
                     return;
                 }
-            }
-            else
-            {
-                std::cerr << "[" << _id << "] Failed to read header: " << error << "\n";
             }
 
             OnReadMessageCompleted(error);
@@ -189,16 +285,31 @@ namespace NetCommon
 
         void OnReadPayloadCompleted(const ErrorCode& error, const size_t nBytesTransferred)
         {
-            if (!error)
-            {
-                assert(_readMessage.payload.size() == nBytesTransferred);
-            }
-            else
+            if (error)
             {
                 std::cerr << "[" << _id << "] Failed to read payload: " << error << "\n";
             }
+            else
+            {
+                assert(_readMessage.payload.size() == nBytesTransferred);
+            }
 
             OnReadMessageCompleted(error);
+        }
+
+        void OnReadMessageCompleted(const ErrorCode& error)
+        {
+            if (error)
+            {
+                CloseAsync();
+                return;
+            }
+
+            boost::asio::post(_receiveStrand,
+                              [pSelf = shared_from_this()]
+                              {
+                                  pSelf->PushMessageToReceiveBuffer();
+                              });
         }
 
         void PushMessageToReceiveBuffer()
@@ -206,135 +317,6 @@ namespace NetCommon
             _receiveBuffer.push(OwnedMessage{shared_from_this(), _readMessage});
 
             ReadMessageAsync();
-        }
-
-        void PushToReceiveBufferAsync()
-        {
-            boost::asio::post(_receiveStrand,
-                              [pSelf = shared_from_this()]()
-                              {
-                                  pSelf->OnPushToReceiveBufferStarted();
-                              });
-        }
-
-        void OnPushToReceiveBufferStarted()
-        {
-            _receiveBuffer.push(OwnedMessage{shared_from_this(), _readMessage});
-
-            ReadHeaderAsync();
-        }
-
-        void PushMessageToSendBuffer(const Message& message)
-        {
-            _sendBuffer.push(message);
-
-            WriteMessageAsync();
-        }
-
-        void WriteMessageAsync()
-        {
-            if (_isWritingMessage || 
-                _sendBuffer.empty())
-            {
-                return;
-            }
-
-            _writeMessage = std::move(_sendBuffer.front());
-            _sendBuffer.pop();
-
-            boost::asio::post(_socketStrand,
-                              [pSelf = shared_from_this()]()
-                              {
-                                  pSelf->WriteHeaderAsync();
-                              });
-
-            _isWritingMessage = true;
-        }
-
-        void OnWriteMessageCompleted(const ErrorCode& error)
-        {
-            _isWritingMessage = false;
-
-            if (!error)
-            {
-                WriteMessageAsync();
-            }
-            else
-            {
-                CloseAsync();
-            }
-        }
-
-        void WriteHeaderAsync()
-        {
-            boost::asio::async_write(_socket,
-                                     boost::asio::buffer(&_writeMessage.header, 
-                                                         sizeof(MessageHeader)),
-                                     [pSelf = shared_from_this()](const ErrorCode& error,
-                                                                  const size_t nBytesTransferred)
-                                     {
-                                         pSelf->OnWriteHeaderCompleted(error, nBytesTransferred);
-                                     });
-        }
-
-        void OnWriteHeaderCompleted(const ErrorCode& error, const size_t nBytesTransferred)
-        {
-            if (!error)
-            {
-                assert(sizeof(MessageHeader) == nBytesTransferred);
-
-                // The size of payload is bigger than 0
-                if (_writeMessage.header.size > sizeof(MessageHeader))
-                {
-                    boost::asio::post(_socketStrand,
-                                      [pSelf = shared_from_this()]()
-                                      {
-                                          pSelf->WritePayloadAsync();
-                                      });
-                    
-                    return;
-                }
-            }
-            else
-            {
-                std::cerr << "[" << _id << "] Failed to write header: " << error << "\n";
-            }
-
-            boost::asio::post(_sendStrand,
-                              [pSelf = shared_from_this(), error]
-                              {
-                                  pSelf->OnWriteMessageCompleted(error);
-                              });            
-        }
-
-        void WritePayloadAsync()
-        {
-            boost::asio::async_write(_socket,
-                                     boost::asio::buffer(_writeMessage.payload.data(),
-                                                         _writeMessage.payload.size()),
-                                     [pSelf = shared_from_this()](const ErrorCode& error,
-                                                                  const size_t nBytesTransferred)
-                                     {
-                                         pSelf->OnWritePayloadCompleted(error, nBytesTransferred);
-                                     });
-        }
-
-        void OnWritePayloadCompleted(const ErrorCode& error, const size_t nBytesTransferred)
-        {
-            if (!error)
-            {
-                assert(nBytesTransferred == _writeMessage.payload.size());
-            }
-            else
-            {
-                std::cerr << "[" << _id << "] Failed to write payload: " << error << "\n";
-            }
-
-            boost::asio::post(_sendStrand,
-                              [pSelf = shared_from_this(), error]
-                              {
-                                  pSelf->OnWriteMessageCompleted(error);
-                              });
         }
 
     private:
