@@ -89,7 +89,7 @@ namespace NetCommon
         Session(ThreadPool& workers,
                 Tcp::socket&& socket,
                 Id id,
-                CloseCallback onSessionClosed,
+                CloseCallback&& onSessionClosed,
                 OwnedMessageBuffer& receiveBuffer,
                 Strand& receiveStrand)
             : _workers(workers)
@@ -319,7 +319,8 @@ namespace NetCommon
 
         void PushMessageToReceiveBuffer()
         {
-            _receiveBuffer.push(OwnedMessage<Session>{shared_from_this(), _readMessage});
+            _receiveBuffer.push(OwnedMessage<Session>{shared_from_this(), 
+                                                      std::move(_readMessage)});
 
             ReadMessageAsync();
         }
