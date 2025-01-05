@@ -38,7 +38,7 @@ namespace NetCommon
             return Pointer(new Session(workers,
                                        std::move(socket),
                                        id,
-                                       onSessionClosed,
+                                       std::move(onSessionClosed),
                                        receiveBuffer,
                                        receiveStrand));
         }
@@ -52,12 +52,14 @@ namespace NetCommon
                               });
         }
 
-        void SendMessageAsync(const Message& message)
+        template<typename TMessage>
+        void SendMessageAsync(TMessage&& message)
         {
             boost::asio::post(_sendStrand,
-                              [pSelf = shared_from_this(), message]()
+                              [pSelf = shared_from_this(), 
+                              message = std::forward<TMessage>(message)]() mutable
                               {
-                                  pSelf->PushMessageToSendBuffer(message);
+                                  pSelf->PushMessageToSendBuffer(std::move(message));
                               });
         }
 
@@ -95,7 +97,7 @@ namespace NetCommon
             , _socketStrand(boost::asio::make_strand(workers))
             , _id(id)
             , _endpoint(_socket.remote_endpoint())
-            , _onSessionClosed(onSessionClosed)
+            , _onSessionClosed(std::move(onSessionClosed))
             , _receiveBuffer(receiveBuffer)
             , _receiveStrand(receiveStrand)
             , _sendStrand(boost::asio::make_strand(workers))
@@ -111,9 +113,10 @@ namespace NetCommon
             }
         }
 
-        void PushMessageToSendBuffer(const Message& message)
+        template<typename TMessage>
+        void PushMessageToSendBuffer(TMessage&& message)
         {
-            _sendBuffer.push(message);
+            _sendBuffer.emplace(std::forward<TMessage>(message));
 
             WriteMessageAsync();
         }

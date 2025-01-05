@@ -102,17 +102,19 @@ namespace NetCommon
                               });
         }
 
-        void SendMessageAsync(SessionPointer pSession, const Message& message)
+        template<typename TMessage>
+        void SendMessageAsync(SessionPointer pSession, TMessage&& message)
         {
             assert(pSession != nullptr);
 
-            pSession->SendMessageAsync(message);
+            pSession->SendMessageAsync(std::forward<TMessage>(message));
         }
 
-        void BroadcastMessageAsync(const Message& message, SessionPointer pIgnoredSession = nullptr)
+        template<typename TMessage>
+        void BroadcastMessageAsync(TMessage&& message, SessionPointer pIgnoredSession = nullptr)
         {
             boost::asio::post(_sessionsStrand,
-                              [this, &message, pIgnoredSession]()
+                              [this, message = std::forward<TMessage>(message), pIgnoredSession]()
                               {
                                   for (auto& pair : _sessions)
                                   {

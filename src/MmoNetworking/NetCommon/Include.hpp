@@ -2,14 +2,11 @@
 
 #include <cassert>
 #include <memory>
-#include <thread>
-#include <mutex>
+#include <utility>
 #include <queue>
-#include <optional>
 #include <vector>
 #include <unordered_map>
 #include <iostream>
-#include <algorithm>
 #include <chrono>
 #include <cstdint>
 #include <cstddef>

@@ -47,7 +47,7 @@ namespace Client
             Message message;
             message.header.id = static_cast<NetCommon::Message::Id>(MessageId::Ping);
 
-            SendMessageAsync(pSession, message);
+            SendMessageAsync(pSession, std::move(message));
         }
 
         void OnPingCompleted(SessionPointer pSession, Message& message)
