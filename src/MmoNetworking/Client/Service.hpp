@@ -22,17 +22,18 @@ namespace Client
     protected:
         virtual void OnSessionRegistered(SessionPointer pSession) override
         {
-            PingAsync(pSession);
+            PingAsync(std::move(pSession));
         }
 
-        virtual void HandleReceivedMessage(SessionPointer pSession, Message& message) override
+        virtual void HandleReceivedMessage(OwnedMessage receivedMessage) override
         {
-            Server::MessageId messageId = static_cast<Server::MessageId>(message.header.id);
+            Server::MessageId messageId = 
+                static_cast<Server::MessageId>(receivedMessage.message.header.id);
 
             switch (messageId)
             {
             case Server::MessageId::Ping:
-                OnPingCompleted(pSession, message);
+                OnPingCompleted(std::move(receivedMessage.pOwner));
                 break;
             default:
                 break;
@@ -47,10 +48,10 @@ namespace Client
             Message message;
             message.header.id = static_cast<NetCommon::Message::Id>(MessageId::Ping);
 
-            SendMessageAsync(pSession, std::move(message));
+            SendMessageAsync(std::move(pSession), std::move(message));
         }
 
-        void OnPingCompleted(SessionPointer pSession, Message& message)
+        void OnPingCompleted(SessionPointer pSession)
         {
             TimePoint end = std::chrono::steady_clock::now();
 
@@ -58,9 +59,9 @@ namespace Client
             std::cout << pSession << " Ping: " << elapsed.count() << "us \n";
 
             _pingTimer.expires_after(std::chrono::seconds(1));
-            _pingTimer.async_wait([this, pSession](const ErrorCode& error)
+            _pingTimer.async_wait([this, pSession = std::move(pSession)](const ErrorCode& error) mutable
                                   {
-                                      PingAsync(pSession);
+                                      PingAsync(std::move(pSession));
                                   });
         }
 

@@ -35,7 +35,7 @@ namespace NetCommon
                                     });
         }
 
-        void OnResolveCompleted(const ErrorCode& error, Endpoints endpoints)
+        void OnResolveCompleted(const ErrorCode& error, const Endpoints& endpoints)
         {
             if (error)
             {

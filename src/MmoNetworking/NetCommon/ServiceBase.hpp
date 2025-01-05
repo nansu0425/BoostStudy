@@ -18,6 +18,7 @@ namespace NetCommon
         using SessionPointer        = Session::Pointer;
         using SessionId             = Session::Id;
         using SessionMap            = std::unordered_map<SessionId, SessionPointer>;
+        using OwnedMessage          = Session::OwnedMessage;
         using OwnedMessageBuffer    = Session::OwnedMessageBuffer;
 
     public:
@@ -48,21 +49,21 @@ namespace NetCommon
         }
 
     protected:
-        virtual bool OnSessionCreated(SessionPointer pSession) { return true; }
+        virtual SessionPointer OnSessionCreated(SessionPointer pSession, bool& isDenied) { return pSession; }
         virtual void OnSessionRegistered(SessionPointer pSession) {}
         virtual void OnSessionUnregistered(SessionPointer pSession) {}
-        virtual void HandleReceivedMessage(SessionPointer pSession, Message& message) {}
+        virtual void HandleReceivedMessage(OwnedMessage receivedMessage) {}
         virtual bool OnReceivedMessagesDispatched() { return true; }
-        virtual void OnTickRateMeasured(const TickRate measured) {}
+        virtual void OnTickRateMeasured(const TickRate tickRate) {}
 
         void CreateSession(Tcp::socket&& socket)
         {
             auto onSessionClosed = [this](SessionPointer pSession)
                                    {
                                        boost::asio::post(_sessionsStrand,
-                                                         [this, pSession]()
+                                                         [this, pSession = std::move(pSession)]() mutable
                                                          {
-                                                             UnregisterSession(pSession);
+                                                             UnregisterSession(std::move(pSession));
                                                          });
                                    };
 
@@ -74,14 +75,16 @@ namespace NetCommon
                                                       _receiveStrand);
             std::cout << pSession << " Session created: " << pSession->GetEndpoint() << "\n";
 
-            if (OnSessionCreated(pSession))
-            {
-                RegisterSessionAsync(pSession);
-            }
-            else
+            bool isDenied = false;
+            pSession = OnSessionCreated(std::move(pSession), isDenied);
+
+            if (isDenied)
             {
                 std::cout << pSession << " Session denied: " << pSession->GetEndpoint() << "\n";
+                return;   
             }
+
+            RegisterSessionAsync(std::move(pSession));
         }
 
         void DestroySessionAsync(SessionPointer pSession)
@@ -94,10 +97,9 @@ namespace NetCommon
             boost::asio::post(_sessionsStrand,
                               [this]()
                               {
-                                  for (auto& pair : _sessions)
+                                  for (auto& sessionPair : _sessions)
                                   {
-                                      SessionPointer pSession = pair.second;
-                                      pSession->CloseAsync();
+                                      sessionPair.second->CloseAsync();
                                   }
                               });
         }
@@ -114,15 +116,15 @@ namespace NetCommon
         void BroadcastMessageAsync(TMessage&& message, SessionPointer pIgnoredSession = nullptr)
         {
             boost::asio::post(_sessionsStrand,
-                              [this, message = std::forward<TMessage>(message), pIgnoredSession]()
+                              [this, 
+                              message = std::forward<TMessage>(message), 
+                              pIgnoredSession = std::move(pIgnoredSession)]()
                               {
-                                  for (auto& pair : _sessions)
+                                  for (auto& sessionPair : _sessions)
                                   {
-                                      SessionPointer pSession = pair.second;
-
-                                      if (pSession != pIgnoredSession)
+                                      if (sessionPair.second != pIgnoredSession)
                                       {
-                                          pSession->SendMessageAsync(message);
+                                          sessionPair.second->SendMessageAsync(message);
                                       }
                                   }
                               });
@@ -141,20 +143,22 @@ namespace NetCommon
         void RegisterSessionAsync(SessionPointer pSession)
         {
             boost::asio::post(_sessionsStrand,
-                              [this, pSession]()
+                              [this, pSession = std::move(pSession)]() mutable
                               {
-                                  RegisterSession(pSession);
+                                  RegisterSession(std::move(pSession));
                               });
         }
 
         void RegisterSession(SessionPointer pSession)
         {
-            _sessions[pSession->GetId()] = pSession;
-            std::cout << _sessions[pSession->GetId()] << " Session registered\n";
+            const SessionId id = pSession->GetId();
 
-            OnSessionRegistered(pSession);
+            _sessions[id] = std::move(pSession);
+            std::cout << _sessions[id] << " Session registered\n";
 
-            pSession->ReceiveMessageAsync();
+            OnSessionRegistered(_sessions[id]);
+
+            _sessions[id]->ReceiveMessageAsync();
         }
 
         void UnregisterSession(SessionPointer pSession)
@@ -164,7 +168,7 @@ namespace NetCommon
             _sessions.erase(pSession->GetId());
             std::cout << pSession << " Session unregistered\n";
 
-            OnSessionUnregistered(pSession);
+            OnSessionUnregistered(std::move(pSession));
         }
 
         void UpdateAsync()
@@ -191,7 +195,7 @@ namespace NetCommon
                         break;
                     }
 
-                    _receivedMessages.push(std::move(_receiveBuffer.front()));
+                    _receivedMessages.emplace(std::move(_receiveBuffer.front()));
                     _receiveBuffer.pop();
                 }
             }
@@ -206,10 +210,8 @@ namespace NetCommon
         {
             while (!_receivedMessages.empty())
             {
-                OwnedMessage receivedMessage = std::move(_receivedMessages.front());
+                HandleReceivedMessage(std::move(_receivedMessages.front()));
                 _receivedMessages.pop();
-
-                HandleReceivedMessage(receivedMessage.pOwner, receivedMessage.message);
             }
 
             const bool shouldUpdate = OnReceivedMessagesDispatched();
@@ -245,8 +247,8 @@ namespace NetCommon
 
             WaitTickRateTimerAsync();
 
-            const TickRate measured = _tickRate.exchange(0);
-            OnTickRateMeasured(measured);
+            const TickRate tickRate = _tickRate.exchange(0);
+            OnTickRateMeasured(tickRate);
         }
 
     protected:

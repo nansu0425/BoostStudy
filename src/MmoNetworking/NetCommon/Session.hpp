@@ -11,7 +11,8 @@ namespace NetCommon
     public:
         using Pointer               = std::shared_ptr<Session>;
         using Id                    = uint32_t;
-        using OwnedMessageBuffer    = OwnedMessage<Session>::Buffer;
+        using OwnedMessage          = OwnedMessage<Session>;
+        using OwnedMessageBuffer    = OwnedMessage::Buffer;
 
     private:
         using ThreadPool            = boost::asio::thread_pool;
@@ -319,8 +320,7 @@ namespace NetCommon
 
         void PushMessageToReceiveBuffer()
         {
-            _receiveBuffer.push(OwnedMessage<Session>{shared_from_this(), 
-                                                      std::move(_readMessage)});
+            _receiveBuffer.push(OwnedMessage{shared_from_this(), std::move(_readMessage)});
 
             ReadMessageAsync();
         }

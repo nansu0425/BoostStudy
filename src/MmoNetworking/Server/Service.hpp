@@ -19,23 +19,24 @@ namespace Server
         {}
 
     protected:
-        virtual void HandleReceivedMessage(SessionPointer pSession, Message& message) override
+        virtual void HandleReceivedMessage(OwnedMessage receivedMessage) override
         {
-            Client::MessageId messageId = static_cast<Client::MessageId>(message.header.id);
+            Client::MessageId messageId = 
+                static_cast<Client::MessageId>(receivedMessage.message.header.id);
 
             switch (messageId)
             {
             case Client::MessageId::Ping:
-                Ping(pSession);
+                Ping(std::move(receivedMessage.pOwner));
                 break;
             default:
                 break;
             }
         }
 
-        virtual void OnTickRateMeasured(const TickRate measured) override
+        virtual void OnTickRateMeasured(const TickRate tickRate) override
         {
-            std::cout << "[SERVER] Tick rate: " << measured << "hz\n";
+            std::cout << "[SERVER] Tick rate: " << tickRate << "hz\n";
         }
 
     private:
@@ -44,7 +45,7 @@ namespace Server
             Message message;
             message.header.id = static_cast<NetCommon::Message::Id>(MessageId::Ping);
 
-            SendMessageAsync(pSession, std::move(message));
+            SendMessageAsync(std::move(pSession), std::move(message));
         }
 
     };
