@@ -4,39 +4,25 @@
 
 namespace NetCommon
 {
-    using MessageId = uint32_t;
-
-    struct MessageHeader
-    {
-        MessageId id = 0;
-        uint32_t size = sizeof(MessageHeader);
-
-        friend std::ostream& operator<<(std::ostream& os, const MessageHeader& header)
-        {
-            os << "[id = " << header.id << " | size = " << header.size << "]";
-
-            return os;
-        }
-    };
-
     struct Message
     {
-        MessageHeader header;
-        std::vector<std::byte> payload;
+        using Id            = uint32_t;
+        using Size          = uint32_t;
+        using Payload       = std::vector<std::byte>;
+        using Buffer        = std::queue<Message>;
+
+        struct Header
+        {
+            Id      id = 0;
+            Size    size = sizeof(Header);
+        };
+
+        Header      header;
+        Payload     payload;
 
         size_t CalculateSize() const
         {
-            return sizeof(MessageHeader) + payload.size();
-        }
-
-        friend std::ostream& operator<<(std::ostream& os, const Message& message)
-        {
-            os << "Header:\n" << message.header << std::endl;
-            
-            os << "Payload:\n";
-            os << "[size = " << message.payload.size() << "]";
-
-            return os;
+            return sizeof(Header) + payload.size();
         }
  
         // Push data to playload of message
@@ -45,12 +31,12 @@ namespace NetCommon
         {
             static_assert(std::is_standard_layout<TData>::value, "Tdata must be standard-layout type");
 
-            size_t offsetData = message.payload.size();
+            const size_t offsetData = message.payload.size();
 
-            message.payload.resize(message.payload.size() + sizeof(TData));
+            message.payload.resize(offsetData + sizeof(TData));
             std::memcpy(message.payload.data() + offsetData, &data, sizeof(TData));
 
-            message.header.size = static_cast<uint32_t>(message.CalculateSize());
+            message.header.size = static_cast<Message::Size>(message.CalculateSize());
 
             return message;
         }
@@ -66,16 +52,27 @@ namespace NetCommon
             std::memcpy(&data, message.payload.data() + offsetData, sizeof(TData));
             message.payload.resize(offsetData);
 
-            message.header.size = static_cast<uint32_t>(message.CalculateSize());
+            message.header.size = static_cast<Message::Size>(message.CalculateSize());
 
             return message;
         }
+
+        friend std::ostream& operator<<(std::ostream& os, const Message& message)
+        {
+            os << "[" << message.header.id << "] Size: " << message.header.size << "B\n";
+
+            return os;
+        }
     };
 
+    template<typename TOwner>
     struct OwnedMessage
     {
-        std::shared_ptr<class Session> pOwner = nullptr;
-        Message message;
+        using OwnerPointer      = std::shared_ptr<TOwner>;
+        using Buffer            = std::queue<OwnedMessage>;
+
+        OwnerPointer    pOwner = nullptr;
+        Message         message;
 
         friend std::ostream& operator<<(std::ostream& os, const OwnedMessage& ownedMessage)
         {

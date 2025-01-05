@@ -42,7 +42,7 @@ namespace Server
         void Ping(SessionPointer pSession)
         {
             Message message;
-            message.header.id = static_cast<NetCommon::MessageId>(MessageId::Ping);
+            message.header.id = static_cast<NetCommon::Message::Id>(MessageId::Ping);
 
             SendMessageAsync(pSession, message);
         }

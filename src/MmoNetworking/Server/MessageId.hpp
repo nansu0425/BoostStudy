@@ -4,7 +4,7 @@
 
 namespace Server
 {
-    enum class MessageId : NetCommon::MessageId
+    enum class MessageId : NetCommon::Message::Id
     {
         Accept = 500,
         Deny,

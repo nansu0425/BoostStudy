@@ -18,6 +18,7 @@ namespace NetCommon
         using SessionPointer        = Session::Pointer;
         using SessionId             = Session::Id;
         using SessionMap            = std::unordered_map<SessionId, SessionPointer>;
+        using OwnedMessageBuffer    = Session::OwnedMessageBuffer;
 
     public:
         ServiceBase(size_t nWorkers, size_t nMaxReceivedMessages)
@@ -203,10 +204,10 @@ namespace NetCommon
         {
             while (!_receivedMessages.empty())
             {
-                OwnedMessage receiveMessage = std::move(_receivedMessages.front());
+                OwnedMessage receivedMessage = std::move(_receivedMessages.front());
                 _receivedMessages.pop();
 
-                HandleReceivedMessage(receiveMessage.pOwner, receiveMessage.message);
+                HandleReceivedMessage(receivedMessage.pOwner, receivedMessage.message);
             }
 
             const bool shouldUpdate = OnReceivedMessagesDispatched();
@@ -257,9 +258,9 @@ namespace NetCommon
         std::atomic<TickRate>           _tickRate;
 
         // Receive
-        std::queue<OwnedMessage>        _receiveBuffer;
+        OwnedMessageBuffer              _receiveBuffer;
         Strand                          _receiveStrand;
-        std::queue<OwnedMessage>        _receivedMessages;
+        OwnedMessageBuffer              _receivedMessages;
         const size_t                    _nMaxReceivedMessages;
 
     };

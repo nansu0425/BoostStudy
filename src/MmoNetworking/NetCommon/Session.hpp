@@ -9,16 +9,18 @@ namespace NetCommon
         : public std::enable_shared_from_this<Session>
     {
     public:
-        using Pointer           = std::shared_ptr<Session>;
-        using Id                = uint32_t;
+        using Pointer               = std::shared_ptr<Session>;
+        using Id                    = uint32_t;
+        using OwnedMessageBuffer    = OwnedMessage<Session>::Buffer;
 
     private:
-        using ThreadPool        = boost::asio::thread_pool;
-        using Strand            = boost::asio::strand<ThreadPool::executor_type>;
-        using ErrorCode         = boost::system::error_code;
-        using Tcp               = boost::asio::ip::tcp;
-        using Endpoints         = boost::asio::ip::basic_resolver_results<Tcp>;
-        using CloseCallback     = std::function<void(Pointer)>;
+        using ThreadPool            = boost::asio::thread_pool;
+        using Strand                = boost::asio::strand<ThreadPool::executor_type>;
+        using ErrorCode             = boost::system::error_code;
+        using Tcp                   = boost::asio::ip::tcp;
+        using Endpoints             = boost::asio::ip::basic_resolver_results<Tcp>;
+        using CloseCallback         = std::function<void(Pointer)>;
+        using MessageBuffer         = Message::Buffer;
 
     public:
         ~Session()
@@ -30,7 +32,7 @@ namespace NetCommon
                               Tcp::socket&& socket,
                               Id id,
                               CloseCallback onSessionClosed,
-                              std::queue<OwnedMessage>& receiveBuffer,
+                              OwnedMessageBuffer& receiveBuffer,
                               Strand& receiveStrand)
         {
             return Pointer(new Session(workers,
@@ -86,7 +88,7 @@ namespace NetCommon
                 Tcp::socket&& socket,
                 Id id,
                 CloseCallback onSessionClosed,
-                std::queue<OwnedMessage>& receiveBuffer,
+                OwnedMessageBuffer& receiveBuffer,
                 Strand& receiveStrand)
             : _workers(workers)
             , _socket(std::move(socket))
@@ -140,7 +142,7 @@ namespace NetCommon
         {
             boost::asio::async_write(_socket,
                                      boost::asio::buffer(&_writeMessage.header,
-                                                         sizeof(MessageHeader)),
+                                                         sizeof(Message::Header)),
                                      [pSelf = shared_from_this()](const ErrorCode& error,
                                                                   const size_t nBytesTransferred)
                                      {
@@ -156,10 +158,10 @@ namespace NetCommon
             }
             else
             {
-                assert(sizeof(MessageHeader) == nBytesTransferred);
+                assert(sizeof(Message::Header) == nBytesTransferred);
 
                 // The size of payload is bigger than 0
-                if (_writeMessage.header.size > sizeof(MessageHeader))
+                if (_writeMessage.header.size > sizeof(Message::Header))
                 {
                     boost::asio::post(_socketStrand,
                                       [pSelf = shared_from_this()]()
@@ -234,7 +236,7 @@ namespace NetCommon
         {
             boost::asio::async_read(_socket,
                                     boost::asio::buffer(&_readMessage.header,
-                                                        sizeof(MessageHeader)),
+                                                        sizeof(Message::Header)),
                                     [pSelf = shared_from_this()](const ErrorCode& error,
                                                                  const size_t nBytesTransferred)
                                     {
@@ -250,13 +252,13 @@ namespace NetCommon
             }
             else
             {
-                assert(nBytesTransferred == sizeof(MessageHeader));
-                assert(_readMessage.header.size >= sizeof(MessageHeader));
+                assert(nBytesTransferred == sizeof(Message::Header));
+                assert(_readMessage.header.size >= sizeof(Message::Header));
 
                 // The size of payload is bigger than 0
-                if (_readMessage.header.size > sizeof(MessageHeader))
+                if (_readMessage.header.size > sizeof(Message::Header))
                 {
-                    _readMessage.payload.resize(_readMessage.header.size - sizeof(MessageHeader));
+                    _readMessage.payload.resize(_readMessage.header.size - sizeof(Message::Header));
 
                     boost::asio::post(_socketStrand,
                                       [pSelf = shared_from_this()]()
@@ -314,7 +316,7 @@ namespace NetCommon
 
         void PushMessageToReceiveBuffer()
         {
-            _receiveBuffer.push(OwnedMessage{shared_from_this(), _readMessage});
+            _receiveBuffer.push(OwnedMessage<Session>{shared_from_this(), _readMessage});
 
             ReadMessageAsync();
         }
@@ -330,12 +332,12 @@ namespace NetCommon
         CloseCallback                   _onSessionClosed;
 
         // Receive
-        std::queue<OwnedMessage>&       _receiveBuffer;
+        OwnedMessageBuffer&             _receiveBuffer;
         Strand&                         _receiveStrand;
         Message                         _readMessage;
 
         // Send
-        std::queue<Message>             _sendBuffer;
+        MessageBuffer                   _sendBuffer;
         Strand                          _sendStrand;
         Message                         _writeMessage;
         bool                            _isWritingMessage;
