@@ -3,13 +3,9 @@
   <ItemGroup>
     <ClInclude Include="Include.hpp" />
     <ClInclude Include="Message.hpp" />
-    <ClInclude Include="Pch.hpp" />
     <ClInclude Include="Session.hpp" />
     <ClInclude Include="ClientServiceBase.hpp" />
     <ClInclude Include="ServiceBase.hpp" />
     <ClInclude Include="ServerServiceBase.hpp" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClCompile Include="Pch.cpp" />
   </ItemGroup>
 </Project>
