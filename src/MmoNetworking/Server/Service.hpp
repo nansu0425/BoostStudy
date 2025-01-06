@@ -26,8 +26,8 @@ namespace Server
 
             switch (messageId)
             {
-            case Client::MessageId::Ping:
-                Ping(std::move(receivedMessage.pOwner));
+            case Client::MessageId::Echo:
+                HandleEcho(std::move(receivedMessage.pOwner));
                 break;
             default:
                 break;
@@ -40,10 +40,10 @@ namespace Server
         }
 
     private:
-        void Ping(SessionPointer pSession)
+        void HandleEcho(SessionPointer pSession)
         {
             Message message;
-            message.header.id = static_cast<NetCommon::Message::Id>(MessageId::Ping);
+            message.header.id = static_cast<NetCommon::Message::Id>(MessageId::Echo);
 
             SendMessageAsync(std::move(pSession), std::move(message));
         }

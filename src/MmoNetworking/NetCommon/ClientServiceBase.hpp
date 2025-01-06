@@ -8,34 +8,48 @@ namespace NetCommon
     {
     protected:
         using Endpoints         = boost::asio::ip::basic_resolver_results<Tcp>;
+        using SocketBuffer      = std::queue<Tcp::socket>;
 
     public:
         ClientServiceBase(size_t nWorkers, 
-                          size_t nMaxReceivedMessages)
+                          size_t nMaxReceivedMessages,
+                          uint16_t nConnects)
             : ServiceBase(nWorkers, nMaxReceivedMessages)
-            , _socket(_workers)
+            , _connectStrand(boost::asio::make_strand(_workers))
             , _resolver(_workers)
-        {}
+        {
+            InitConnectBuffer(nConnects);
+        }
 
         void Start(std::string_view host, std::string_view service)
         {   
-            ConnectAsync(host, service);
+            ResolveAsync(host, service);
             std::cout << "[CLIENT] Started!\n";
         }
 
     private:
-        void ConnectAsync(std::string_view host, std::string_view service)
+        void InitConnectBuffer(const uint16_t nConnects)
+        {
+            assert(nConnects > 0);
+
+            for (int i = 0; i < nConnects; ++i)
+            {
+                _connectBuffer.emplace(_workers);
+            }
+        }
+
+        void ResolveAsync(std::string_view host, std::string_view service)
         {
             _resolver.async_resolve(host,
                                     service,
                                     [this](const ErrorCode& error,
                                            Endpoints endpoints)
                                     {
-                                        OnResolveCompleted(error, endpoints);
+                                        OnResolveCompleted(error, std::move(endpoints));
                                     });
         }
 
-        void OnResolveCompleted(const ErrorCode& error, const Endpoints& endpoints)
+        void OnResolveCompleted(const ErrorCode& error, Endpoints&& endpoints)
         {
             if (error)
             {
@@ -43,8 +57,14 @@ namespace NetCommon
                 return;
             }
 
-            boost::asio::async_connect(_socket,
-                                       endpoints,
+            _endpoints = std::move(endpoints);
+            ConnectAsync();
+        }
+
+        void ConnectAsync()
+        {
+            boost::asio::async_connect(_connectBuffer.front(),
+                                       _endpoints,
                                        [this](const ErrorCode& error,
                                               const Tcp::endpoint& endpoint)
                                        {
@@ -60,12 +80,22 @@ namespace NetCommon
                 return;
             }
 
-            CreateSession(std::move(_socket));
+            CreateSession(std::move(_connectBuffer.front()));
+            _connectBuffer.pop();
+
+            if (_connectBuffer.empty())
+            {
+                return;
+            }
+
+            ConnectAsync();
         }
 
     private:
-        Tcp::socket         _socket;
+        SocketBuffer        _connectBuffer;
+        Strand              _connectStrand;
         Tcp::resolver       _resolver;
+        Endpoints           _endpoints;
 
     };
 }

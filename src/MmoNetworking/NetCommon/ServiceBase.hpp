@@ -12,6 +12,7 @@ namespace NetCommon
         using Strand                = boost::asio::strand<ThreadPool::executor_type>;
         using Timer                 = boost::asio::steady_timer;
         using Seconds               = std::chrono::seconds;
+        using MicroSeconds          = std::chrono::microseconds;
         using TickRate              = uint32_t;
         using ErrorCode             = boost::system::error_code;
         using Tcp                   = boost::asio::ip::tcp;

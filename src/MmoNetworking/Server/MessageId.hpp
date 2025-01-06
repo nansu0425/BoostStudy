@@ -8,7 +8,7 @@ namespace Server
     {
         Accept = 500,
         Deny,
-        Ping,
+        Echo,
         Send,
         Broadcast,
     };
