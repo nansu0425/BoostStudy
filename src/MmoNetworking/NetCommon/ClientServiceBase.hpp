@@ -21,7 +21,7 @@ namespace NetCommon
             InitConnectBuffer(nConnects);
         }
 
-        void Start(std::string_view host, std::string_view service)
+        void Start(const char* host, const char* service)
         {   
             ResolveAsync(host, service);
             std::cout << "[CLIENT] Started!\n";
@@ -38,7 +38,7 @@ namespace NetCommon
             }
         }
 
-        void ResolveAsync(std::string_view host, std::string_view service)
+        void ResolveAsync(const char* host, const char* service)
         {
             _resolver.async_resolve(host,
                                     service,
